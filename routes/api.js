@@ -14,14 +14,14 @@ const ADMIN_KEY = "admin123";
 /**
  * GET /files - List all subjects and their files
  */
-router.get('/files', (req, res) => {
-  res.json({ subjects: storageService.getFiles() });
+router.get('/files', async (req, res) => {
+  res.json({ subjects: await storageService.getFiles() });
 });
 
 /**
  * DELETE /files/:subject/:id - Delete a file (Admin only)
  */
-router.delete('/files/:subject/:id', (req, res) => {
+router.delete('/files/:subject/:id', async (req, res) => {
   const { subject, id } = req.params;
   const key = req.headers['admin-key'];
 
@@ -29,7 +29,7 @@ router.delete('/files/:subject/:id', (req, res) => {
     return res.status(401).json({ error: "Unauthorized. Admin/Faculty key required." });
   }
 
-  const success = storageService.deleteFile(subject, id);
+  const success = await storageService.deleteFile(subject, id);
   if (success) {
     res.json({ message: "File deleted successfully" });
   } else {
@@ -50,7 +50,8 @@ router.post('/upload', upload.single('pdfFile'), async (req, res) => {
     const fileName = req.file.originalname;
     
     // Check if filename already exists in this subject
-    const currentFiles = storageService.getFiles()[subject] || [];
+    const subjectFiles = await storageService.getFiles();
+    const currentFiles = subjectFiles[subject] || [];
     if (currentFiles.some(f => f.fileName === fileName)) {
        return res.json({ message: "File already processed.", skip: true });
     }
@@ -65,7 +66,7 @@ router.post('/upload', upload.single('pdfFile'), async (req, res) => {
       chunksWithEmbeds.push({ text: chunk, embedding });
     }
 
-    storageService.addFile(subject, fileName, chunksWithEmbeds);
+    await storageService.addFile(subject, fileName, chunksWithEmbeds);
     res.json({ message: "PDF processed successfully", chunks: chunks.length });
   } catch (error) {
     console.error("Upload Error:", error);
@@ -87,7 +88,7 @@ router.post('/query', async (req, res) => {
     const queryEmbedding = await aiService.getEmbedding(question, "query");
 
     // Get chunks (filtered by subject if provided)
-    const allChunks = storageService.getAllChunks(subject);
+    const allChunks = await storageService.getAllChunks(subject);
     
     if (allChunks.length === 0) {
       return res.json({ answer: "Please upload some material for this subject first." });
