@@ -147,7 +147,9 @@ app.post("/query", async (req, res) => {
     }
 
     // 1. Convert question into embedding
+    console.log(`Asking question: "${question}"`);
     const queryEmbedding = await getEmbedding(question, "query");
+    console.log("Question embedding generated.");
 
     // 2. Compare with stored embeddings using cosine similarity
     const similarities = documentData.map((doc) => ({
@@ -168,6 +170,7 @@ app.post("/query", async (req, res) => {
 
     // 4. Send to OpenAI chat model
     // 4. Send to NVIDIA API using native fetch
+    console.log("Sending prompt to NVIDIA API...");
     const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -186,17 +189,20 @@ app.post("/query", async (req, res) => {
             content: `Context:\n${contextText}\n\nQuestion: ${question}`
           }
         ],
-        temperature: 0.2, 
-        chat_template_kwargs: {"enable_thinking":true} // From your python snippet!
+        temperature: 0.1, 
+        chat_template_kwargs: {"enable_thinking": false} // Set to false to avoid speed issues on free tier
       })
     });
 
     if (!response.ok) {
-       throw new Error(await response.text());
+       const errorMsg = await response.text();
+       console.error("NVIDIA API Error:", errorMsg);
+       throw new Error(`NVIDIA API Error: ${errorMsg}`);
     }
 
     const data = await response.json();
     const answer = data.choices[0].message.content;
+    console.log("AI reply received.");
 
     res.json({ answer });
   } catch (error) {
