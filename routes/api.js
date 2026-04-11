@@ -112,11 +112,8 @@ router.post('/query', async (req, res) => {
       finalContext = scoredChunks[0].text;
     }
 
-    if (!finalContext) {
-      return res.json({ answer: "Not found in provided material" });
-    }
-
-    const stream = await aiService.getChatAnswer(question, finalContext);
+    // Always proceed to AI for hybrid answering (Knowledge + Context)
+    const stream = await aiService.getChatAnswer(question, finalContext || "");
     
     // Set headers for streaming
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
