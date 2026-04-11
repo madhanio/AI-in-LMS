@@ -33,7 +33,7 @@ export class AiService {
   }
 
   /**
-   * Generates chat answer based on context
+   * Generates chat answer based on context as a stream
    */
   async getChatAnswer(question, contextText) {
     const response = await fetch(`${BASE_URL}/chat/completions`, {
@@ -47,18 +47,18 @@ export class AiService {
         messages: [
           {
             role: "system",
-            content: `You are a reliable academic assistant for an LMS. 
-            Answer strictly ONLY from the provided document context. 
-            Keep your answer academic, clear, and structured. 
-            If the answer is definitely not in the context, respond with "Not found in provided material".`
+            content: `You are a helpful and intelligent Academic Mentor for a Learning Management System (LMS). 
+            If document context is provided below, prioritize using it to answer clearly and accurately. 
+            However, if the context is missing or doesn't have the answer, use your general knowledge to help the student. 
+            Be encouraging, academic, and adapt your detail level to the question.`
           },
           {
             role: "user",
-            content: `Context:\n${contextText}\n\nStudent Question: ${question}`
+            content: `Document Context:\n${contextText}\n\nStudent Question: ${question}`
           }
         ],
         temperature: 0.1, 
-        chat_template_kwargs: {"enable_thinking": false}
+        stream: true // Enable streaming!
       })
     });
 
@@ -66,8 +66,7 @@ export class AiService {
        throw new Error(`Chat API Error: ${await response.text()}`);
     }
 
-    const data = await response.json();
-    return data.choices[0].message.content;
+    return response.body; // Returns the readable stream
   }
 }
 

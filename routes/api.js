@@ -116,11 +116,27 @@ router.post('/query', async (req, res) => {
       return res.json({ answer: "Not found in provided material" });
     }
 
-    const answer = await aiService.getChatAnswer(question, finalContext);
-    res.json({ answer });
+    const stream = await aiService.getChatAnswer(question, finalContext);
+    
+    // Set headers for streaming
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Transfer-Encoding', 'chunked');
+
+    // Iterate over the stream and send to client
+    const reader = stream.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      res.write(value);
+    }
+    res.end();
   } catch (error) {
     console.error("Query Error:", error);
-    res.status(500).json({ error: error.message });
+    if (!res.headersSent) {
+      res.status(500).json({ error: error.message });
+    } else {
+      res.end();
+    }
   }
 });
 
