@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Academic Assistant | Admin Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #F98012;
+            --secondary: #1A1A2E;
+            --bg: #F5F7F9;
+            --white: #FFFFFF;
+            --error: #FF4D4D;
+            --success: #2ECC71;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg);
+            color: var(--secondary);
+            line-height: 1.6;
+        }
+
+        .navbar {
+            background-color: var(--white);
+            padding: 1.5rem 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+            position: sticky; top: 0; z-index: 100;
+        }
+
+        .logo { font-weight: 800; font-size: 1.5rem; color: var(--secondary); }
+        .logo span { color: var(--primary); }
+
+        .container { max-width: 1100px; margin: 3rem auto; padding: 0 5%; display: grid; grid-template-columns: 1fr 1.5fr; gap: 2.5rem; }
+
+        @media (max-width: 850px) { .container { grid-template-columns: 1fr; } }
+
+        .card {
+            background: var(--white);
+            padding: 2.5rem;
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.03);
+            border: 1px solid rgba(0,0,0,0.02);
+        }
+
+        h2 { font-weight: 800; margin-bottom: 1.5rem; font-size: 1.3rem; display: flex; align-items: center; gap: 10px; }
+        
+        .form-group { margin-bottom: 1.5rem; }
+        label { display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem; }
+        
+        input, select {
+            width: 100%;
+            padding: 1rem 1.2rem;
+            border: 2px solid #EEE;
+            border-radius: 14px;
+            font-family: inherit;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        input:focus, select:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 4px rgba(249, 128, 18, 0.1); }
+
+        .btn {
+            width: 100%;
+            padding: 1rem;
+            border: none;
+            border-radius: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            font-size: 1rem;
+        }
+
+        .btn-primary { background-color: var(--primary); color: white; }
+        .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(249, 128, 18, 0.2); }
+
+        .drop-zone {
+            border: 2px dashed #DDD;
+            padding: 2.5rem;
+            border-radius: 18px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: #888;
+        }
+
+        .drop-zone:hover, .drop-zone.active { border-color: var(--primary); background: rgba(249, 128, 18, 0.02); color: var(--primary); }
+
+        .subject-list { list-style: none; margin-top: 1.5rem; }
+        .subject-item {
+            background: #F8F9FA;
+            padding: 0.8rem 1.2rem;
+            border-radius: 12px;
+            margin-bottom: 0.8rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+        }
+
+        .delete-btn {
+            background: none;
+            border: none;
+            color: #AAA;
+            cursor: pointer;
+            font-weight: 900;
+            padding: 5px 10px;
+            transition: color 0.3s;
+        }
+
+        .delete-btn:hover { color: var(--error); }
+
+        .status {
+            padding: 1rem;
+            border-radius: 12px;
+            margin-top: 1rem;
+            font-weight: 600;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        .spinner {
+            width: 20px; height: 20px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: none; margin: 0 auto;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="logo">ACADEMIC<span>CORE</span> ADMIN</div>
+        <div style="font-weight: 600; opacity: 0.6; font-size: 0.9rem;">Faculty Portal</div>
+    </nav>
+
+    <div class="container">
+        
+        <!-- Subject Management -->
+        <div class="card">
+            <h2>🏷️ Manage Subjects</h2>
+            <div class="form-group">
+                <input type="text" id="newSubject" placeholder="e.g. Advanced AI (AAI)">
+            </div>
+            <button class="btn btn-primary" onclick="addSubject()">Add New Subject</button>
+            <ul class="subject-list" id="subjectList">
+                <!-- Loaded dynamically -->
+            </ul>
+        </div>
+
+        <!-- PDF Upload -->
+        <div class="card">
+            <h2>🚀 Upload Center</h2>
+            <div class="form-group">
+                <label>Select Subject</label>
+                <select id="subjectSelect">
+                    <!-- Loaded dynamically -->
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Study Material (PDF)</label>
+                <div class="drop-zone" id="dropZone">
+                    <p id="fileName">Drag & drop or click to select PDF</p>
+                    <input type="file" id="fileInput" accept="application/pdf" style="display: none;">
+                </div>
+            </div>
+
+            <button class="btn btn-primary" id="uploadBtn" onclick="uploadPdf()">
+                <span id="btnText">Upload & Process Material</span>
+                <div id="loader" class="spinner"></div>
+            </button>
+
+            <div id="status" class="status"></div>
+        </div>
+
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileNameDisplay = document.getElementById('fileName');
+        const statusDiv = document.getElementById('status');
+        const loader = document.getElementById('loader');
+        const btnText = document.getElementById('btnText');
+
+        // Initial Load
+        window.onload = loadSubjects;
+
+        async function loadSubjects() {
+            try {
+                const res = await fetch(`${API_BASE}/subjects`);
+                const data = await res.json();
+                const list = document.getElementById('subjectList');
+                const select = document.getElementById('subjectSelect');
+                
+                list.innerHTML = '';
+                select.innerHTML = '<option value="">-- Choose a subject --</option>';
+
+                data.subjects.forEach(sub => {
+                    list.innerHTML += `
+                        <li class="subject-item">
+                            ${sub}
+                            <button class="delete-btn" onclick="deleteSubject('${sub}')">×</button>
+                        </li>
+                    `;
+                    select.innerHTML += `<option value="${sub}">${sub}</option>`;
+                });
+            } catch (e) {
+                showStatus('Error loading subjects', true);
+            }
+        }
+
+        async function addSubject() {
+            const name = document.getElementById('newSubject').value;
+            if (!name) return;
+            
+            await fetch(`${API_BASE}/subjects`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            });
+            document.getElementById('newSubject').value = '';
+            loadSubjects();
+        }
+
+        async function deleteSubject(name) {
+            if (!confirm(`Are you sure? This will delete all PDFs in ${name}.`)) return;
+            await fetch(`${API_BASE}/subjects/${encodeURIComponent(name)}`, { method: 'DELETE' });
+            loadSubjects();
+        }
+
+        // Dropzone logic
+        dropZone.onclick = () => fileInput.click();
+        fileInput.onchange = (e) => {
+            if (e.target.files.length) fileNameDisplay.innerText = e.target.files[0].name;
+        };
+
+        async function uploadPdf() {
+            const subject = document.getElementById('subjectSelect').value;
+            const file = fileInput.files[0];
+
+            if (!subject || !file) {
+                showStatus('Please select a subject and a file first.', true);
+                return;
+            }
+
+            setLoading(true);
+            const formData = new FormData();
+            formData.append('pdfFile', file);
+            formData.append('subject', subject);
+
+            try {
+                const res = await fetch(`${API_BASE}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                
+                if (data.error) throw new Error(data.error);
+                showStatus(`Success! Processed ${data.chunks} knowledge chunks.`, false);
+            } catch (e) {
+                showStatus(e.message, true);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function showStatus(msg, isError) {
+            statusDiv.innerText = msg;
+            statusDiv.style.display = 'block';
+            statusDiv.style.backgroundColor = isError ? '#ffe3e3' : '#e3ffeb';
+            statusDiv.style.color = isError ? 'var(--error)' : 'var(--success)';
+            setTimeout(() => { statusDiv.style.display = 'none'; }, 5000);
+        }
+
+        function setLoading(isLoading) {
+            loader.style.display = isLoading ? 'block' : 'none';
+            btnText.style.display = isLoading ? 'none' : 'block';
+            document.getElementById('uploadBtn').disabled = isLoading;
+        }
+    </script>
+</body>
+</html>

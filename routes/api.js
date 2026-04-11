@@ -138,4 +138,43 @@ router.post('/query', async (req, res) => {
   }
 });
 
+/**
+ * GET /subjects - Fetch all subjects
+ */
+router.get('/subjects', async (req, res) => {
+  try {
+    const subjects = await storageService.getSubjects();
+    res.json({ subjects });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /subjects - Add a new subject
+ */
+router.post('/subjects', async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ error: "Subject name is required" });
+    await storageService.addSubject(name);
+    res.json({ message: "Subject added successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * DELETE /subjects/:name - Remove a subject and its files
+ */
+router.delete('/subjects/:name', async (req, res) => {
+  try {
+    const { name } = req.params;
+    await storageService.deleteSubject(name);
+    res.json({ message: `Subject ${name} and all its files deleted.` });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

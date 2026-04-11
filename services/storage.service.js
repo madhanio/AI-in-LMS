@@ -12,28 +12,76 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl || "", supabaseKey || "");
 
 export class StorageService {
+  /**
+   * Fetch all subjects from the database
+   */
+  async getSubjects() {
+    const { data, error } = await supabase
+      .from('subjects')
+      .select('name')
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error("Error fetching subjects:", error);
+      return [];
+    }
+    return data.map(s => s.name);
+  }
+
+  /**
+   * Add a new subject
+   */
+  async addSubject(name) {
+    const { error } = await supabase
+      .from('subjects')
+      .insert([{ name }]);
+    
+    if (error && error.code !== '23505') { // Ignore duplicate errors
+      throw error;
+    }
+    return true;
+  }
+
+  /**
+   * Delete a subject and all its related documents
+   */
+  async deleteSubject(name) {
+    // 1. Delete all documents related to this subject
+    await supabase
+      .from('documents')
+      .delete()
+      .eq('subject', name);
+
+    // 2. Delete the subject itself
+    const { error } = await supabase
+      .from('subjects')
+      .delete()
+      .eq('name', name);
+
+    if (error) throw error;
+    return true;
+  }
+
   async getFiles() {
-    // Group files by subject based on documents in Supabase
+    // 1. Get all subject names
+    const subjectList = await this.getSubjects();
+    
+    // 2. Get all document metadata
     const { data, error } = await supabase
       .from('documents')
       .select('subject, file_name, id')
       .order('id', { ascending: false });
 
     if (error) {
-      console.error("Supabase fetch error:", error);
-      return {};
+       console.error("Supabase fetch error:", error);
+       return {};
     }
 
-    const subjects = {
-      "Computer networks(CN)": [],
-      "Constituion of India(CoI)": [],
-      "Introduction to data science(IDS)": [],
-      "object oriented programming using Java(OOPJ)": [],
-      "Software engineering(SE)": [],
-      "Statistical and mathematical foundations(SMF)": []
-    };
+    // Initialize with all subjects (even empty ones)
+    const subjects = {};
+    subjectList.forEach(s => subjects[s] = []);
 
-    // To remove duplicate fileNames conceptually per subject, we group them
+    // Group files by subject
     const fileMap = new Map();
     data.forEach(row => {
       const key = `${row.subject}-${row.file_name}`;
@@ -60,24 +108,15 @@ export class StorageService {
       embedding: chunk.embedding
     }));
 
-    // Batch insert into Supabase
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('documents')
-      .insert(rows)
-      .select('id, file_name, subject');
+      .insert(rows);
 
-    if (error) {
-      console.error("Supabase insert error:", error);
-      throw error;
-    }
-
+    if (error) throw error;
     return true;
   }
 
   async deleteFile(subject, fileId) {
-    // the fileId passed here is actually the ID from the query, 
-    // but originally we deleted by matching the exact file_name.
-    // Let's first get the file_name for this id
     const { data: doc } = await supabase
       .from('documents')
       .select('file_name')
@@ -96,22 +135,22 @@ export class StorageService {
     return false;
   }
 
-  // Fallback to fetch all subject chunks if RPC is not used
   async getAllChunks(filterSubject = null) {
     let query = supabase.from('documents').select('content, embedding');
     if (filterSubject) {
       query = query.eq('subject', filterSubject);
     }
     
-    // Supabase sets limit default to 1000 items, let's bump it up for larger PDFs
     const { data, error } = await query.limit(10000);
-    
     if (error) {
       console.error("Supabase fetch all chunks error:", error);
       return [];
     }
     
-    return data.map(d => ({ text: d.content, embedding: JSON.parse(d.embedding) }));
+    return data.map(d => ({ 
+      text: d.content, 
+      embedding: typeof d.embedding === 'string' ? JSON.parse(d.embedding) : d.embedding 
+    }));
   }
 }
 
