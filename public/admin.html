@@ -203,6 +203,7 @@
         async function loadSubjects() {
             try {
                 const res = await fetch(`${API_BASE}/subjects`);
+                if (!res.ok) throw new Error('Could not fetch subjects');
                 const data = await res.json();
                 const list = document.getElementById('subjectList');
                 const select = document.getElementById('subjectSelect');
@@ -220,21 +221,33 @@
                     select.innerHTML += `<option value="${sub}">${sub}</option>`;
                 });
             } catch (e) {
-                showStatus('Error loading subjects', true);
+                console.error(e);
+                showStatus('Error loading subjects: ' + e.message, true);
             }
         }
 
         async function addSubject() {
-            const name = document.getElementById('newSubject').value;
+            const input = document.getElementById('newSubject');
+            const name = input.value.trim();
             if (!name) return;
             
-            await fetch(`${API_BASE}/subjects`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name })
-            });
-            document.getElementById('newSubject').value = '';
-            loadSubjects();
+            try {
+                const res = await fetch(`${API_BASE}/subjects`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to add subject');
+
+                input.value = '';
+                showStatus('Subject added successfully!', false);
+                loadSubjects();
+            } catch (e) {
+                console.error(e);
+                showStatus('Error: ' + e.message, true);
+            }
         }
 
         async function deleteSubject(name) {
