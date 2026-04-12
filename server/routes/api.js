@@ -1,11 +1,14 @@
 import express from 'express';
 import multer from 'multer';
 import jwt from 'jsonwebtoken';
+import dotenv from 'dotenv';
 import { storageService } from '../services/storage.service.js';
 import { pdfService } from '../services/pdf.service.js';
 import { aiService } from '../services/ai.service.js';
 import { cosineSimilarity } from '../utils/vector.util.js';
 import { authenticateAdmin } from '../middleware/auth.js';
+
+dotenv.config();
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -17,7 +20,10 @@ const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
  */
 router.post('/login', (req, res) => {
   const { username, password } = req.body;
-  if (username === process.env.ADMIN_USER && password === process.env.ADMIN_PASSWORD) {
+  const expectedUser = (process.env.ADMIN_USER || '').trim();
+  const expectedPass = (process.env.ADMIN_PASSWORD || '').trim();
+
+  if (username?.trim() === expectedUser && password?.trim() === expectedPass) {
     const token = jwt.sign({ username }, JWT_SECRET, { expiresIn: '1h' });
     res.cookie('admin_token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
     return res.json({ message: 'Login successful' });
