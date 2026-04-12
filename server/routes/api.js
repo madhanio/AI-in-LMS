@@ -131,47 +131,37 @@ router.post('/query', async (req, res) => {
 
     const thresholdChunks = scoredChunks.filter(c => c.score > 0.4);
 
-    // 9. Fallback Handling
-    if (thresholdChunks.length === 0) {
-      // 10. Analytics Tracking (Fallback case)
-      storageService.logQuery(question, 0, scoredChunks[0]?.score || 0, Date.now() - startTime, subject);
-
-      // Return synthetic SSE to frontend
-      res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('Connection', 'keep-alive');
+    // Setup context for AI
+    let finalContext = "";
+    if (thresholdChunks.length > 0) {
+      const topChunks = thresholdChunks.slice(0, topK);
+      finalContext = topChunks.map(c => {
+         const meta = [];
+         if (c.file_name) meta.push(`[File: ${c.file_name}]`);
+         if (c.page_number) meta.push(`[Page: ${c.page_number}]`);
+         if (c.section_title) meta.push(`[Section: ${c.section_title}]`);
+         if (c.chunk_type && c.chunk_type !== 'text') meta.push(`[Type: ${c.chunk_type}]`);
+         return `${meta.length > 0 ? meta.join(" ") + "\\n" : ""}${c.text}`;
+      }).join("\n\n---\n\n");
       
-      const fallbackStr = JSON.stringify({ choices: [{ delta: { content: "I couldn't find relevant information in the uploaded materials. Please consult your instructor or check if the right PDF is uploaded." } }] });
-      res.write(`data: ${fallbackStr}\n\n`);
-      res.write('data: [DONE]\n\n');
-      return res.end();
+      // Analytics for success
+      const avgSim = topChunks.reduce((acc, c) => acc + c.score, 0) / topChunks.length;
+      storageService.logQuery(question, topChunks.length, avgSim, Date.now() - startTime, subject);
+    } else {
+      // Analytics for "No Context" case
+      storageService.logQuery(question, 0, scoredChunks[0]?.score || 0, Date.now() - startTime, subject);
+      finalContext = "No relevant text found in the uploaded PDFs for this specific query.";
     }
+
+    // 8. Conversation memory & Proceed to AI (Proceed regardless of context)
+    const stream = await aiService.getChatAnswer(question, finalContext, history, subject);
     
-    const topChunks = thresholdChunks.slice(0, topK);
-
-    // Context preparation with Metadata (3)
-    const finalContext = topChunks.map(c => {
-       const meta = [];
-       if (c.file_name) meta.push(`[File: ${c.file_name}]`);
-       if (c.page_number) meta.push(`[Page: ${c.page_number}]`);
-       if (c.section_title) meta.push(`[Section: ${c.section_title}]`);
-       if (c.chunk_type && c.chunk_type !== 'text') meta.push(`[Type: ${c.chunk_type}]`);
-       return `${meta.length > 0 ? meta.join(" ") + "\\n" : ""}${c.text}`;
-    }).join("\n\n---\n\n");
-
-    // 8. Conversation memory & Proceed to AI
-    const stream = await aiService.getChatAnswer(question, finalContext, history);
-    
-    // 10. Analytics Tracking
-    const avgSim = topChunks.reduce((acc, c) => acc + c.score, 0) / topChunks.length;
-    storageService.logQuery(question, topChunks.length, avgSim, Date.now() - startTime, subject);
-
     // Set headers for streaming (No-buffering is critical for speed)
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no'); 
-    res.flushHeaders(); // Ensure headers are sent immediately
+    res.flushHeaders(); 
 
     // Iterate over the stream and send to client
     const reader = stream.getReader();
