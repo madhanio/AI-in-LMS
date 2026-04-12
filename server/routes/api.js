@@ -1,15 +1,38 @@
 import express from 'express';
 import multer from 'multer';
+import jwt from 'jsonwebtoken';
 import { storageService } from '../services/storage.service.js';
 import { pdfService } from '../services/pdf.service.js';
 import { aiService } from '../services/ai.service.js';
 import { cosineSimilarity } from '../utils/vector.util.js';
+import { authenticateAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Admin Key for deletion simulation
-const ADMIN_KEY = "admin123";
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
+
+/**
+ * ADMIN AUTH ROUTES
+ */
+router.post('/login', (req, res) => {
+  const { username, password } = req.body;
+  if (username === process.env.ADMIN_USER && password === process.env.ADMIN_PASSWORD) {
+    const token = jwt.sign({ username }, JWT_SECRET, { expiresIn: '1h' });
+    res.cookie('admin_token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
+    return res.json({ message: 'Login successful' });
+  }
+  res.status(401).json({ error: 'Invalid credentials' });
+});
+
+router.post('/logout', (req, res) => {
+  res.clearCookie('admin_token');
+  res.json({ message: 'Logout successful' });
+});
+
+router.get('/check-auth', authenticateAdmin, (req, res) => {
+  res.json({ authenticated: true, user: req.admin.username });
+});
 
 /**
  * GET /files - List all subjects and their files
@@ -21,13 +44,8 @@ router.get('/files', async (req, res) => {
 /**
  * DELETE /files/:subject/:id - Delete a file (Admin only)
  */
-router.delete('/files/:subject/:id', async (req, res) => {
+router.delete('/files/:subject/:id', authenticateAdmin, async (req, res) => {
   const { subject, id } = req.params;
-  const key = req.headers['admin-key'];
-
-  if (key !== ADMIN_KEY) {
-    return res.status(401).json({ error: "Unauthorized. Admin/Faculty key required." });
-  }
 
   const success = await storageService.deleteFile(subject, id);
   if (success) {
@@ -40,7 +58,7 @@ router.delete('/files/:subject/:id', async (req, res) => {
 /**
  * POST /upload - Process and store PDF
  */
-router.post('/upload', upload.single('pdfFile'), async (req, res) => {
+router.post('/upload', authenticateAdmin, upload.single('pdfFile'), async (req, res) => {
   try {
     const { subject } = req.body;
     if (!req.file || !subject) {
@@ -96,8 +114,9 @@ router.post('/query', async (req, res) => {
     // Embed the expanded query
     const queryEmbedding = await aiService.getEmbedding(expandedQuery, "query");
 
-    // Get chunks (filtered by subject if provided)
-    const allChunks = await storageService.getAllChunks(subject);
+    // Get chunks (include global calendar context)
+    const searchSubjects = subject ? [subject, '__CALENDAR__'] : ['__CALENDAR__'];
+    const allChunks = await storageService.getAllChunks(searchSubjects);
     
     if (allChunks.length === 0) {
       return res.json({ answer: "Please upload some material for this subject first." });
@@ -203,7 +222,7 @@ router.get('/subjects', async (req, res) => {
 /**
  * POST /subjects - Add a new subject
  */
-router.post('/subjects', async (req, res) => {
+router.post('/subjects', authenticateAdmin, async (req, res) => {
   try {
     const { name } = req.body;
     if (!name) return res.status(400).json({ error: "Subject name is required" });
@@ -217,7 +236,7 @@ router.post('/subjects', async (req, res) => {
 /**
  * DELETE /subjects/:name - Remove a subject and its files
  */
-router.delete('/subjects/:name', async (req, res) => {
+router.delete('/subjects/:name', authenticateAdmin, async (req, res) => {
   try {
     const { name } = req.params;
     await storageService.deleteSubject(name);

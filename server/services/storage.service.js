@@ -25,7 +25,8 @@ export class StorageService {
       console.error("Error fetching subjects:", error);
       return [];
     }
-    return data.map(s => s.name);
+    // Filter out internal system subjects like __CALENDAR__
+    return data.map(s => s.name).filter(name => !name.startsWith('__'));
   }
 
   /**
@@ -143,10 +144,15 @@ export class StorageService {
     return false;
   }
 
-  async getAllChunks(filterSubject = null) {
+  async getAllChunks(filterSubjects = null) {
     let query = supabase.from('documents').select('content, embedding, page_number, section_title, file_name, chunk_type');
-    if (filterSubject) {
-      query = query.eq('subject', filterSubject);
+    
+    if (filterSubjects) {
+      if (Array.isArray(filterSubjects)) {
+        query = query.in('subject', filterSubjects);
+      } else {
+        query = query.eq('subject', filterSubjects);
+      }
     }
     
     // Support large subjects by increasing limit or paginating eventually, but 10k is fine for now

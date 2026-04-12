@@ -6,6 +6,7 @@ import 'widgets/message_bubble.dart';
 import 'widgets/typing_indicator.dart';
 import 'widgets/subject_chip_row.dart';
 import 'widgets/input_bar.dart';
+import 'widgets/suggestion_cards.dart';
 
 class AiChatScreen extends StatefulWidget {
   const AiChatScreen({super.key});
@@ -72,7 +73,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
               final messages = chatProvider.messages;
               final isTyping = chatProvider.isTyping;
-              final displayCount = messages.length + (isTyping ? 1 : 0);
+              final showSuggestions = messages.length <= 1 && !isTyping;
+              final extraWidgets = (isTyping ? 1 : 0) + (showSuggestions ? 1 : 0);
 
               return Column(
                 children: [
@@ -80,17 +82,27 @@ class _AiChatScreenState extends State<AiChatScreen> {
                     child: ListView.builder(
                       controller: _scrollController,
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                      itemCount: displayCount,
+                      itemCount: messages.length + extraWidgets,
                       itemBuilder: (context, index) {
-                        if (index == messages.length) {
+                        if (index < messages.length) {
+                          return MessageBubble(message: messages[index]);
+                        }
+                        
+                        // Extra widgets (Typing or Suggestions)
+                        if (isTyping && index == messages.length) {
                           return const Row(
                             mainAxisAlignment: MainAxisAlignment.start,
-                            children: [
-                              TypingIndicator(),
-                            ],
+                            children: [TypingIndicator()],
                           );
                         }
-                        return MessageBubble(message: messages[index]);
+
+                        if (showSuggestions) {
+                          return SuggestionCards(
+                            onSelect: (prompt) => chatProvider.sendMessage(prompt),
+                          );
+                        }
+
+                        return const SizedBox.shrink();
                       },
                     ),
                   ),
