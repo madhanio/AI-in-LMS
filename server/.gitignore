@@ -1,0 +1,12 @@
+# Dependency directories
+node_modules/
+
+# Environment variables and confidential credentials
+.env
+.env.*
+!.env.example
+
+# Logs and debug files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
