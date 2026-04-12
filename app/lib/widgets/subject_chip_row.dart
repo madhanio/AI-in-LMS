@@ -28,24 +28,32 @@ class SubjectChipRow extends StatelessWidget {
             child: InkWell(
               onTap: () => chatProvider.selectSubject(subject),
               borderRadius: BorderRadius.circular(20),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                   color: isSelected ? const Color(0xFFFF8C00) : Colors.transparent,
                   border: Border.all(
-                    color: isSelected ? const Color(0xFFFF8C00) : Colors.grey.shade300,
+                    color: isSelected ? const Color(0xFFFF8C00) : const Color(0xFFD1D1D6),
                   ),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Center(
-                  child: Text(
-                    subject.split('(').last.replaceAll(')', ''), // Short name logic
-                    style: GoogleFonts.inter(
-                      color: isSelected ? Colors.white : Colors.grey.shade700,
-                      fontSize: 13,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isSelected)
+                      const Padding(
+                        padding: EdgeInsets.only(right: 6),
+                        child: Icon(Icons.check, size: 14, color: Colors.white),
+                      ),
+                    Text(
+                      subject.split('(').last.replaceAll(')', ''), // Short name logic
+                      style: GoogleFonts.inter(
+                        color: isSelected ? Colors.white : const Color(0xFF6B6B6B),
+                        fontSize: 13,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ),

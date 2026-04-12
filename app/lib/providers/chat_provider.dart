@@ -45,14 +45,32 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void selectSubject(String subject) {
-    if (_selectedSubject?.trim() == subject.trim()) return;
-    
+    // 1. Toggle: If already selected, deselect it
+    if (_selectedSubject == subject) {
+      _selectedSubject = null;
+      
+      // Clean up the switch message if it was the last one added
+      if (_messages.isNotEmpty && _messages.last.isSystemSwitch) {
+        _messages.removeLast();
+      }
+      notifyListeners();
+      return;
+    }
+
+    // 2. Set new subject
     _selectedSubject = subject;
-    _messages.add(Message(
-      id: "sys_${DateTime.now()}",
-      text: '📘 Switched to **$subject**. Ask me anything!',
-      isUser: false,
-    ));
+
+    // 3. Smart Replacement: If the last message was a switch message, replace its text
+    if (_messages.isNotEmpty && _messages.last.isSystemSwitch) {
+      _messages.last.text = '📘 Switched to **$subject**. Ask me anything!';
+    } else {
+      _messages.add(Message(
+        id: 'sys_${DateTime.now()}',
+        text: '📘 Switched to **$subject**. Ask me anything!',
+        isUser: false,
+        isSystemSwitch: true,
+      ));
+    }
     notifyListeners();
   }
 
