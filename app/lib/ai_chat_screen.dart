@@ -71,8 +71,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
               WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
 
               final messages = chatProvider.messages;
-              final isStreaming = chatProvider.isStreaming;
-              final showTyping = isStreaming && messages.isNotEmpty && messages.last.text.isEmpty;
+              final isTyping = chatProvider.isTyping;
+              final displayCount = messages.length + (isTyping ? 1 : 0);
 
               return Column(
                 children: [
@@ -80,10 +80,15 @@ class _AiChatScreenState extends State<AiChatScreen> {
                     child: ListView.builder(
                       controller: _scrollController,
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                      itemCount: messages.length + (showTyping ? 1 : 0),
+                      itemCount: displayCount,
                       itemBuilder: (context, index) {
                         if (index == messages.length) {
-                          return const TypingIndicator();
+                          return const Row(
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            children: [
+                              TypingIndicator(),
+                            ],
+                          );
                         }
                         return MessageBubble(message: messages[index]);
                       },

@@ -16,11 +16,13 @@ class ChatProvider extends ChangeNotifier {
   List<String> _subjects = [];
   String? _selectedSubject;
   bool _isStreaming = false;
+  bool _isTyping = false;
   
   List<Message> get messages => _messages;
   List<String> get subjects => _subjects;
   String? get selectedSubject => _selectedSubject;
   bool get isStreaming => _isStreaming;
+  bool get isTyping => _isTyping;
 
   // Base URL configuration
   final String _baseUrl = 'https://ai-in-lms.onrender.com/api';
@@ -43,12 +45,11 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void selectSubject(String subject) {
-    if (_selectedSubject == subject) return;
+    if (_selectedSubject?.trim() == subject.trim()) return;
     
     _selectedSubject = subject;
-    // (b) Immediately add an assistant message
     _messages.add(Message(
-      id: DateTime.now().toString(),
+      id: "sys_${DateTime.now()}",
       text: '📘 Switched to **$subject**. Ask me anything!',
       isUser: false,
     ));
@@ -58,44 +59,38 @@ class ChatProvider extends ChangeNotifier {
   Future<void> sendMessage(String text) async {
     if (text.trim().isEmpty || _isStreaming) return;
 
+    _isStreaming = true;
+    _isTyping = true;
+    
     // Add user message
-    final userMsg = Message(
+    _messages.add(Message(
       id: DateTime.now().toString(),
       text: text,
       isUser: true,
-    );
-    _messages.add(userMsg);
+    ));
     
-    // Add placeholder assistant message for streaming
-    final assistantMsg = Message(
-      id: 'stream_${DateTime.now()}',
-      text: '',
-      isUser: false,
-    );
-    _messages.add(assistantMsg);
-    
-    _isStreaming = true;
     notifyListeners();
 
-    // Prepare history (last 6 messages / 3 pairs)
-    final history = _messages
-        .take(_messages.length - 2) // exclude the current pair
+    // Prepare history
+    final formattedHistory = _messages
+        .where((m) => !m.id.startsWith("sys_")) // Exclude system messages from history
         .toList();
     
-    final recentHistory = history.length > 6 
-        ? history.sublist(history.length - 6) 
-        : history;
+    final historyToSend = formattedHistory.length > 6 
+        ? formattedHistory.sublist(formattedHistory.length - 6) 
+        : formattedHistory;
         
-    final formattedHistory = recentHistory.map((m) => {
+    final historyMap = historyToSend.map((m) => {
       'role': m.isUser ? 'user' : 'assistant',
       'content': m.text
     }).toList();
 
-    // (c) Prepend subject context if selected
     String finalQuestion = text;
     if (_selectedSubject != null) {
       finalQuestion = "[Subject: $_selectedSubject] $text";
     }
+
+    Message? assistantMsg;
 
     try {
       final client = http.Client();
@@ -104,21 +99,20 @@ class ChatProvider extends ChangeNotifier {
       request.body = json.encode({
         'question': finalQuestion,
         'subject': _selectedSubject,
-        'history': formattedHistory,
+        'history': historyMap,
       });
 
       final response = await client.send(request).timeout(const Duration(seconds: 30));
 
       if (response.statusCode != 200) {
-        assistantMsg.text = 'Something went wrong. Server error: ${response.statusCode}';
+        _isTyping = false;
+        _messages.add(Message(id: 'err_${DateTime.now()}', text: 'Something went wrong. Server error.', isUser: false));
         _isStreaming = false;
         notifyListeners();
         return;
       }
 
-      final stream = response.stream
-          .transform(utf8.decoder)
-          .transform(const LineSplitter());
+      final stream = response.stream.transform(utf8.decoder).transform(const LineSplitter());
 
       await for (final line in stream) {
         final trimmed = line.trim();
@@ -129,19 +123,25 @@ class ChatProvider extends ChangeNotifier {
           try {
             final decoded = json.decode(dataStr);
             final content = decoded['choices']?[0]['delta']?['content'];
-            if (content != null) {
-              assistantMsg.text += content;
+            if (content != null && content.isNotEmpty) {
+              if (assistantMsg == null) {
+                // First chunk arrived! Hide typing indicator and add the message bubble
+                _isTyping = false;
+                assistantMsg = Message(id: 'ai_${DateTime.now()}', text: content, isUser: false);
+                _messages.add(assistantMsg);
+              } else {
+                assistantMsg.text += content;
+              }
               notifyListeners();
             }
-          } catch (e) {
-            // Skip malformed chunks
-          }
+          } catch (e) {}
         }
       }
     } catch (e) {
-      assistantMsg.text = 'Something went wrong. Try again.';
-      debugPrint('Streaming Error: $e');
+      _isTyping = false;
+      _messages.add(Message(id: 'err_${DateTime.now()}', text: 'Something went wrong. Try again.', isUser: false));
     } finally {
+      _isTyping = false;
       _isStreaming = false;
       notifyListeners();
     }
