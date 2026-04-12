@@ -166,10 +166,12 @@ router.post('/query', async (req, res) => {
     const avgSim = topChunks.reduce((acc, c) => acc + c.score, 0) / topChunks.length;
     storageService.logQuery(question, topChunks.length, avgSim, Date.now() - startTime, subject);
 
-    // Set headers for streaming
+    // Set headers for streaming (No-buffering is critical for speed)
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); 
+    res.flushHeaders(); // Ensure headers are sent immediately
 
     // Iterate over the stream and send to client
     const reader = stream.getReader();
