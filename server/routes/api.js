@@ -183,6 +183,7 @@ router.post('/query', async (req, res) => {
       storageService.logQuery(question, 0, scoredChunks[0]?.score || 0, Date.now() - startTime, subject);
       finalContext = "No relevant text found in the uploaded PDFs for this specific query.";
     }
+  }
 
     // 8. Conversation memory & Proceed to AI (Proceed regardless of context)
     const stream = await aiService.getChatAnswer(question, finalContext, history, subject);
@@ -207,7 +208,7 @@ router.post('/query', async (req, res) => {
       // Log streaming error to analytics
       storageService.logQuery(`[STREAM_ERROR] ${question}`, topChunks.length, avgSim, Date.now() - startTime, subject);
     } finally {
-      res.end();
+        res.end();
     }
   } catch (error) {
     console.error("Query Error:", error);
