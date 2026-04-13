@@ -100,101 +100,68 @@ router.post('/upload', authenticateAdmin, upload.single('pdfFile'), async (req, 
   }
 });
 
-/**
- * POST /query - Semantic search and AI answer
- */
 router.post('/query', async (req, res) => {
   const startTime = Date.now();
+  let finalContext = "No specific lecture notes found for this query.";
+  const { question, subject, history = [] } = req.body;
+
   try {
-    const { question, subject, history = [] } = req.body;
     if (!question) {
       return res.status(400).json({ error: "Question is required" });
     }
 
     console.log(`Querying ${subject || 'global'} for: ${question}`);
-    
-    // SMART INTENT DETECTION: Skip heavy lifting (Expansion/Search) for casual/meta talk
+
     const academicKeywords = ['explain', 'what', 'how', 'concept', 'solve', 'theory', 'notes', 'syllabus', 'exam', 'test', 'subject', 'lecture', 'past paper'];
     const isAcademic = academicKeywords.some(word => question.toLowerCase().includes(word));
-    
-    let finalContext = "No specific lecture notes found for this query.";
+
     if (isAcademic) {
+      let queryVal = question;
       if (question.trim().split(/\s+/).length >= 3) {
         console.log(`Expanding academic query...`);
-        expandedQuery = await aiService.expandQuery(question);
-        queryEmbedding = await aiService.getEmbedding(expandedQuery, "query");
-      } else {
-        console.log(`Short academic query detected, skipping expansion.`);
-        queryEmbedding = await aiService.getEmbedding(question, "query");
+        queryVal = await aiService.expandQuery(question);
       }
-
-      // Get chunks (include global calendar context)
+      
+      const queryEmbedding = await aiService.getEmbedding(queryVal, "query");
       const searchSubjects = subject ? [subject, '__CALENDAR__'] : ['__CALENDAR__'];
       const allChunks = await storageService.getAllChunks(searchSubjects);
       
       if (allChunks.length > 0) {
-      // 4. Hybrid Ranking (Semantic + Keyword)
-      const keywords = expandedQuery.toLowerCase().split(/\s+/).filter(w => w.length > 3);
-      const scoredChunks = allChunks.map(c => {
-        const semanticScore = cosineSimilarity(queryEmbedding, c.embedding);
-      
-      // Basic keyword frequency boost
-      const textLower = c.text.toLowerCase();
-      let keywordMatches = 0;
-      keywords.forEach(kw => {
-        if (textLower.includes(kw)) keywordMatches += 0.05; // 5% boost per keyword match
-      });
+        const keywords = queryVal.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+        const scoredChunks = allChunks.map(c => {
+          const semanticScore = cosineSimilarity(queryEmbedding, c.embedding);
+          const textLower = c.text.toLowerCase();
+          let keywordMatches = 0;
+          keywords.forEach(kw => { if (textLower.includes(kw)) keywordMatches += 0.05; });
+          return { ...c, score: semanticScore + Math.min(keywordMatches, 0.15) };
+        });
 
-      return {
-        ...c,
-        score: semanticScore + Math.min(keywordMatches, 0.15) // max 15% boost from keywords
-      };
-    });
+        scoredChunks.sort((a, b) => b.score - a.score);
+        const thresholdChunks = scoredChunks.filter(c => c.score > 0.4);
 
-    scoredChunks.sort((a, b) => b.score - a.score);
-    
-    // 2. Dynamic Top-K Retrieval
-    const wordCount = question.split(' ').length;
-    let topK = 3;
-    if (wordCount > 10 && wordCount <= 25) topK = 5;
-    else if (wordCount > 25) topK = 8;
-
-    const thresholdChunks = scoredChunks.filter(c => c.score > 0.4);
-
-    // Setup context for AI
-    if (thresholdChunks.length > 0) {
-      const topChunks = thresholdChunks.slice(0, topK);
-      finalContext = topChunks.map(c => {
-         const meta = [];
-         if (c.file_name) meta.push(`[File: ${c.file_name}]`);
-         if (c.page_number) meta.push(`[Page: ${c.page_number}]`);
-         if (c.section_title) meta.push(`[Section: ${c.section_title}]`);
-         if (c.chunk_type && c.chunk_type !== 'text') meta.push(`[Type: ${c.chunk_type}]`);
-         return `${meta.length > 0 ? meta.join(" ") + "\\n" : ""}${c.text}`;
-      }).join("\n\n---\n\n");
-      
-      // Analytics for success
-      const avgSim = topChunks.reduce((acc, c) => acc + c.score, 0) / topChunks.length;
-      storageService.logQuery(question, topChunks.length, avgSim, Date.now() - startTime, subject);
+        if (thresholdChunks.length > 0) {
+          const topK = question.split(' ').length > 25 ? 8 : 4;
+          const topChunks = thresholdChunks.slice(0, topK);
+          finalContext = topChunks.map(c => {
+             const meta = [c.file_name, c.page_number ? `P${c.page_number}` : ''].filter(Boolean);
+             return `${meta.length ? '[' + meta.join(' ') + '] ' : ''}${c.text}`;
+          }).join('\n---\n');
+          
+          const avgSim = topChunks.reduce((acc, c) => acc + c.score, 0) / topChunks.length;
+          storageService.logQuery(question, topChunks.length, avgSim, Date.now() - startTime, subject);
+        }
+      }
     } else {
-      // Analytics for "No Context" case
-      storageService.logQuery(question, 0, scoredChunks[0]?.score || 0, Date.now() - startTime, subject);
-      finalContext = "No relevant text found in the uploaded PDFs for this specific query.";
+      console.log("Casual/Meta query detected. Skipping PDF search.");
     }
-  }
-}
 
-    // 8. Conversation memory & Proceed to AI (Proceed regardless of context)
     const stream = await aiService.getChatAnswer(question, finalContext, history, subject);
     
-    // Set headers for streaming (No-buffering is critical for speed)
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no'); 
     res.flushHeaders(); 
 
-    // Iterate over the stream and send to client
     const reader = stream.getReader();
     try {
       while (true) {
@@ -202,12 +169,10 @@ router.post('/query', async (req, res) => {
         if (done) break;
         res.write(value);
       }
-    } catch (streamError) {
-      console.error("Streaming interrupted:", streamError);
-      // Log streaming error to analytics
-      storageService.logQuery(`[STREAM_ERROR] ${question}`, topChunks.length, avgSim, Date.now() - startTime, subject);
+    } catch (err) {
+      console.error("Stream interrupted", err);
     } finally {
-        res.end();
+      res.end();
     }
   } catch (error) {
     console.error("Query Error:", error);
