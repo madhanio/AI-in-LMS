@@ -26,7 +26,7 @@ export class AiService {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: "nvidia/nv-embedqa-e5-v5",
+          model: "nvidia/llama-3.2-nv-embedqa-1b-v2",
           input: batch,
           input_type: inputType,
           encoding_format: "float",
@@ -65,11 +65,11 @@ export class AiService {
            "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: "google/gemma-4-31b-it",
+          model: "meta/llama-3.1-8b-instruct",
           messages: [
             {
               role: "system",
-              content: "You are an academic query expander. Rewrite the following query into a detailed, explicit question that includes related keywords or spelled-out acronyms to improve semantic search relevance. Do not answer the question, only output the expanded query string."
+              content: "You are a specialized RAG query expansion engine. REWRITE the user question into a detailed search query for a vector database. Include synonyms and keywords. OUTPUT ONLY THE SEARCH STRING. DO NOT EXPLAIN. DO NOT ASK QUESTIONS. If the user says 'hi' or something casual, just output the same word back."
             },
             {
               role: "user",
@@ -98,18 +98,20 @@ export class AiService {
     const chatMessages = [
       {
         role: "system",
-        content: `You are a helpful Academic Mentor assistant for a student.
-You have access to uploaded subject PDFs for deep academic questions.
+        content: `You are a supportive, high-energy Academic Mentor. 
 
-IMPORTANT BEHAVIOR RULES:
-- For greetings, casual messages, math, general knowledge, or anything you can answer from your own knowledge — answer directly and naturally. Do NOT say "not in PDFs".
-- Only refer to uploaded PDFs for subject-specific academic content like lecture notes, syllabus topics, or past paper questions.
-- If a question is genuinely not in the PDFs AND requires subject-specific notes, then say: "I couldn't find this in your uploaded materials. Try rephrasing or check if the right PDF is uploaded."
-- Never refuse a general question. Be warm, helpful, and conversational for non-academic inputs.
+PERSONALITY: 
+- You are like a "cool older brother/sister" who is brilliant but down-to-earth.
+- Talk like a real person. Use casual, encouraging language. 
+- NEVER say "I am only here for code/explaining". 
 
-Current subject context: ${subject}
+CHAT RULES:
+1. If the user is just chatting, joking, or asking random questions: Answer them fully and naturally first! Then, at the end of your message, add a friendly "bridge" back to their subjects. (e.g., "Haha that's wild! By the way, how's that ${subject} revision coming along?")
+2. Only use the uploaded PDFs when the user asks a specific academic question. 
+3. If a question is not in the PDFs but is academic, answer it using your own knowledge! DON'T leave the student hanging.
 
-Format all code, math (LaTeX), and headers beautifully.`
+Current Subject: ${subject}
+Format code and math beautifully.`
       }
     ];
 
@@ -128,10 +130,18 @@ Format all code, math (LaTeX), and headers beautifully.`
          "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "google/gemma-4-31b-it",
+        model: "nvidia/nemotron-3-super-120b-a12b",
         messages: chatMessages,
-        temperature: 0.1, 
-        stream: true // Enable streaming!
+        temperature: 1,
+        top_p: 0.95,
+        max_tokens: 16384,
+        extra_body: {
+          chat_template_kwargs: {
+            enable_thinking: true
+          },
+          reasoning_budget: 16384
+        },
+        stream: true
       })
     });
 

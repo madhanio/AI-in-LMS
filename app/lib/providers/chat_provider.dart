@@ -120,7 +120,7 @@ class ChatProvider extends ChangeNotifier {
         'history': historyMap,
       });
 
-      final response = await client.send(request).timeout(const Duration(seconds: 30));
+      final response = await client.send(request).timeout(const Duration(seconds: 90));
 
       if (response.statusCode != 200) {
         _isTyping = false;
@@ -140,19 +140,30 @@ class ChatProvider extends ChangeNotifier {
 
           try {
             final decoded = json.decode(dataStr);
-            final content = decoded['choices']?[0]['delta']?['content'];
-            if (content != null && content.isNotEmpty) {
-              if (assistantMsg == null) {
-                // First chunk arrived! Hide typing indicator and add the message bubble
-                _isTyping = false;
-                assistantMsg = Message(id: 'ai_${DateTime.now()}', text: content, isUser: false);
-                _messages.add(assistantMsg);
-              } else {
-                assistantMsg.text += content;
+            final choices = decoded['choices'] as List?;
+            
+            // Safety check: ensure choices is not null or empty
+            if (choices != null && choices.isNotEmpty) {
+              final delta = choices[0]['delta'];
+              
+              // Check for both content and reasoning_content (Thinking)
+              final content = delta?['content'] ?? delta?['reasoning_content'];
+
+              if (content != null && content.isNotEmpty) {
+                if (assistantMsg == null) {
+                  // First chunk arrived (could be reasoning)! 
+                  _isTyping = false;
+                  assistantMsg = Message(id: 'ai_${DateTime.now()}', text: content, isUser: false);
+                  _messages.add(assistantMsg);
+                } else {
+                  assistantMsg.text += content;
+                }
+                notifyListeners();
               }
-              notifyListeners();
             }
-          } catch (e) {}
+          } catch (e) {
+            debugPrint("Streaming Error: $e");
+          }
         }
       }
     } catch (e) {

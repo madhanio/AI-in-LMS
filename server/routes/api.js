@@ -113,12 +113,19 @@ router.post('/query', async (req, res) => {
 
     console.log(`Querying ${subject || 'global'} for: ${question}`);
     
-    // 7. Query Expansion
-    const expandedQuery = await aiService.expandQuery(question);
-    console.log(`Expanded query: ${expandedQuery}`);
-    
-    // Embed the expanded query
-    const queryEmbedding = await aiService.getEmbedding(expandedQuery, "query");
+    // Skip expansion/embedding for short greetings or single words
+    let expandedQuery = question;
+    let queryEmbedding;
+
+    if (question.trim().split(/\s+/).length >= 3) {
+      console.log(`Expanding query...`);
+      expandedQuery = await aiService.expandQuery(question);
+      console.log(`Expanded query: ${expandedQuery}`);
+      queryEmbedding = await aiService.getEmbedding(expandedQuery, "query");
+    } else {
+      console.log(`Short query detected, skipping expansion.`);
+      queryEmbedding = await aiService.getEmbedding(question, "query");
+    }
 
     // Get chunks (include global calendar context)
     const searchSubjects = subject ? [subject, '__CALENDAR__'] : ['__CALENDAR__'];
