@@ -112,9 +112,9 @@ router.post('/query', async (req, res) => {
 
     console.log(`Querying ${subject || 'global'} for: ${question}`);
 
-    // 🔥 AI-POWERED INTENT GOVERNOR
+    // 🔥 TRIPLE-PATH INTENT GOVERNOR
     const intent = await aiService.getIntent(question);
-    const isAcademic = intent === 'ACADEMIC';
+    const isAcademic = intent.startsWith('STUDY'); 
     console.log(`Intent detected: ${intent}`);
 
     if (isAcademic) {

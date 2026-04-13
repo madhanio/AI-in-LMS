@@ -91,7 +91,7 @@ export class AiService {
   }
 
   /**
-   * Fast classification of intent
+   * Triple-Path Intent Governor
    */
   async getIntent(question) {
     try {
@@ -104,44 +104,58 @@ export class AiService {
         body: JSON.stringify({
           model: "meta/llama-3.1-8b-instruct",
           messages: [
-            { role: "system", content: "Classify the user intent as exactly 'ACADEMIC' (study, syllabus, explaining topics) or 'CASUAL' (greetings, identity, jokes, meta-talk). Output only one word." },
+            { 
+              role: "system", 
+              content: `Classify user intent into exactly one category:
+              - 'CASUAL': Greetings, jokes, identity, or meta-talk.
+              - 'STUDY_QUICK': Simple definitions, facts, or short academic questions (e.g., 'What is X?').
+              - 'STUDY_DEEP': Complex explanations, 'how it works', comparisons, or deep reasoning.` 
+            },
             { role: "user", content: question }
           ],
           temperature: 0.1,
-          max_tokens: 5
+          max_tokens: 10
         })
       });
       const data = await response.json();
-      return (data.choices[0]?.message?.content || 'CASUAL').toUpperCase().trim();
+      const intent = (data.choices[0]?.message?.content || 'CASUAL').toUpperCase();
+      if (intent.includes('DEEP')) return 'STUDY_DEEP';
+      if (intent.includes('QUICK')) return 'STUDY_QUICK';
+      return 'CASUAL';
     } catch {
-      return 'ACADEMIC'; // Fallback to safe side
+      return 'STUDY_QUICK';
     }
   }
 
   /**
    * Generates chat answer based on context as a stream
    */
-  async getChatAnswer(question, contextText, history = [], subject = "General Academics", intent = "ACADEMIC") {
-    const isAcademic = intent === "ACADEMIC";
-    const modelToUse = isAcademic ? "nvidia/nemotron-3-super-120b-a12b" : "meta/llama-3.1-8b-instruct";
+  async getChatAnswer(question, contextText, history = [], subject = "General Academics", intent = "STUDY_QUICK") {
+    // 120B is only for deep study. Everything else (including quick study) uses the fast 8B.
+    const isDeep = intent === "STUDY_DEEP";
+    const isCasual = intent === "CASUAL";
+    const modelToUse = isDeep ? "nvidia/nemotron-3-super-120b-a12b" : "meta/llama-3.1-8b-instruct";
     
-    // Strict instructions for brevity in casual mode
-    const systemPrompt = isAcademic 
-      ? `You are a supportive Academic Mentor. Explain topics clearly using the context provided. Math/Code should be formatted beautifully.`
-      : `You are a snappy Academic Mentor. The user is just chatting. BE EXTREMELY BRIEF (max 2 sentences) and keep it natural.`;
+    let systemPrompt = `You are a supportive Academic Mentor. Explain topics clearly using the context.`;
+    if (isCasual) {
+      systemPrompt = `You are a snappy Academic Mentor. The user is just chatting. BE EXTREMELY BRIEF (max 2 sentences) and keep it natural.`;
+    }
 
     const chatMessages = [
       { role: "system", content: systemPrompt },
       ...history,
-      { role: "user", content: isAcademic ? `Context:\n${contextText}\n\nStudent: ${question}` : question }
+      { 
+        role: "user", 
+        content: isCasual ? question : `Context:\n${contextText}\n\nStudent Question: ${question}` 
+      }
     ];
 
     const requestBody = {
       model: modelToUse,
       messages: chatMessages,
-      temperature: isAcademic ? 0.7 : 0.8,
+      temperature: isDeep ? 0.7 : 0.8,
       top_p: 0.9,
-      max_tokens: isAcademic ? 16384 : 512,
+      max_tokens: isDeep ? 16384 : 1024,
       stream: true
     };
 
