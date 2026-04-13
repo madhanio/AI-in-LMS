@@ -91,43 +91,60 @@ export class AiService {
   }
 
   /**
+   * Fast classification of intent
+   */
+  async getIntent(question) {
+    try {
+      const response = await fetch(`${BASE_URL}/chat/completions`, {
+        method: "POST",
+        headers: {
+           "Authorization": `Bearer ${NVIDIA_API_KEY}`,
+           "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "meta/llama-3.1-8b-instruct",
+          messages: [
+            { role: "system", content: "Classify the user intent as exactly 'ACADEMIC' (study, syllabus, explaining topics) or 'CASUAL' (greetings, identity, jokes, meta-talk). Output only one word." },
+            { role: "user", content: question }
+          ],
+          temperature: 0.1,
+          max_tokens: 5
+        })
+      });
+      const data = await response.json();
+      return (data.choices[0]?.message?.content || 'CASUAL').toUpperCase().trim();
+    } catch {
+      return 'ACADEMIC'; // Fallback to safe side
+    }
+  }
+
+  /**
    * Generates chat answer based on context as a stream
    */
-  async getChatAnswer(question, contextText, history = [], subject = "General Academics") {
-    // SMART INTENT DETECTION: Academic or Casual?
-    const lowerQ = question.toLowerCase();
-    const isAcademic = !['what can you do', 'who are you', 'help', 'hi', 'hey', 'hello', 'snap', 'chat'].some(p => lowerQ.includes(p)) && 
-                       (['explain', 'define', 'solve', 'theory', 'notes', 'syllabus', 'exam', 'concept'].some(t => lowerQ.includes(t)) || question.split(/\s+/).length > 8);
-    
-    // Choose model: Fast 8B for chatter, Heavy 120B for study
+  async getChatAnswer(question, contextText, history = [], subject = "General Academics", intent = "ACADEMIC") {
+    const isAcademic = intent === "ACADEMIC";
     const modelToUse = isAcademic ? "nvidia/nemotron-3-super-120b-a12b" : "meta/llama-3.1-8b-instruct";
     
+    // Strict instructions for brevity in casual mode
+    const systemPrompt = isAcademic 
+      ? `You are a supportive Academic Mentor. Explain topics clearly using the context provided. Math/Code should be formatted beautifully.`
+      : `You are a snappy Academic Mentor. The user is just chatting. BE EXTREMELY BRIEF (max 2 sentences). Give a friendly answer and bridge back to their studies.`;
+
     const chatMessages = [
-      {
-        role: "system",
-        content: `You are a supportive Academic Mentor. 
-        RULE 1: For casual talk (e.g., 'What can you do?'), be EXTREMELY BRIEF (max 2 sentences). 
-        RULE 2: End EVERY casual response with a friendly bridge to their studies.`
-      },
+      { role: "system", content: systemPrompt },
       ...history,
-      {
-        role: "user",
-        content: isAcademic 
-          ? `Subject: ${subject}\nContext:\n${contextText}\n\nStudent: ${question}`
-          : `Student asks a casual question: ${question}`
-      }
+      { role: "user", content: isAcademic ? `Context:\n${contextText}\n\nStudent: ${question}` : question }
     ];
 
     const requestBody = {
       model: modelToUse,
       messages: chatMessages,
-      temperature: isAcademic ? 1.0 : 0.7,
+      temperature: isAcademic ? 0.7 : 0.8,
       top_p: 0.9,
-      max_tokens: isAcademic ? 16384 : 1024,
+      max_tokens: isAcademic ? 16384 : 512,
       stream: true
     };
 
-    // Only add reasoning/thinking parameters for the massive 120B model (the only one that supports it)
     if (modelToUse === "nvidia/nemotron-3-super-120b-a12b") {
       requestBody.extra_body = {
         chat_template_kwargs: { enable_thinking: false },

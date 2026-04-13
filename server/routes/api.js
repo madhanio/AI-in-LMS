@@ -112,9 +112,10 @@ router.post('/query', async (req, res) => {
 
     console.log(`Querying ${subject || 'global'} for: ${question}`);
 
-    const lowerQ = question.toLowerCase();
-    const isAcademic = !['what can you do', 'who are you', 'help', 'hi', 'hey', 'hello', 'snap', 'chat'].some(p => lowerQ.includes(p)) && 
-                       (['explain', 'define', 'solve', 'theory', 'notes', 'syllabus', 'exam', 'concept'].some(t => lowerQ.includes(t)) || question.split(/\s+/).length > 8);
+    // 🔥 AI-POWERED INTENT GOVERNOR
+    const intent = await aiService.getIntent(question);
+    const isAcademic = intent === 'ACADEMIC';
+    console.log(`Intent detected: ${intent}`);
 
     if (isAcademic) {
       let queryVal = question;
@@ -156,7 +157,7 @@ router.post('/query', async (req, res) => {
       console.log("Casual/Meta query detected. Skipping PDF search.");
     }
 
-    const stream = await aiService.getChatAnswer(question, finalContext, history, subject);
+    const stream = await aiService.getChatAnswer(question, finalContext, history, subject, intent);
     
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache');
