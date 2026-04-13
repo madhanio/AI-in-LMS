@@ -182,6 +182,7 @@ router.post('/query', async (req, res) => {
       finalContext = "No relevant text found in the uploaded PDFs for this specific query.";
     }
   }
+}
 
     // 8. Conversation memory & Proceed to AI (Proceed regardless of context)
     const stream = await aiService.getChatAnswer(question, finalContext, history, subject);
