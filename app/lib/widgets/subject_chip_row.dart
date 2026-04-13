@@ -10,7 +10,7 @@ class SubjectChipRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final chatProvider = context.watch<ChatProvider>();
     
-    // 🎭 SKELETON LOADER: If loading, show pulsing placeholders so the app feels instant
+    // 🎭 ANIMATED SKELETON LOADER: Perfectly looping pulse for that premium feel
     if (chatProvider.isLoadingSubjects) {
       return Container(
         height: 50,
@@ -19,19 +19,14 @@ class SubjectChipRow extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16),
           itemCount: 4,
-          itemBuilder: (context, index) => Container(
-            width: 80,
-            margin: const EdgeInsets.only(right: 8),
-            decoration: BoxDecoration(
-              color: Colors.grey.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-          ),
+          itemBuilder: (context, index) => const _SkeletonChip(),
         ),
       );
     }
 
     if (chatProvider.subjects.isEmpty) return const SizedBox.shrink();
+    
+    // ... rest of the build method ...
 
     return Container(
       height: 50,
@@ -80,6 +75,49 @@ class SubjectChipRow extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _SkeletonChip extends StatefulWidget {
+  const _SkeletonChip();
+
+  @override
+  State<_SkeletonChip> createState() => _SkeletonChipState();
+}
+
+class _SkeletonChipState extends State<_SkeletonChip> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    )..repeat(reverse: true);
+    _animation = Tween<double>(begin: 0.3, end: 0.7).animate(_controller);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _animation,
+      child: Container(
+        width: 85,
+        margin: const EdgeInsets.only(right: 8),
+        decoration: BoxDecoration(
+          color: Colors.grey[300],
+          borderRadius: BorderRadius.circular(20),
+        ),
       ),
     );
   }
