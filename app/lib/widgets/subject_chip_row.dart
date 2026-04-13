@@ -10,6 +10,27 @@ class SubjectChipRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final chatProvider = context.watch<ChatProvider>();
     
+    // 🎭 SKELETON LOADER: If loading, show pulsing placeholders so the app feels instant
+    if (chatProvider.isLoadingSubjects) {
+      return Container(
+        height: 50,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: 4,
+          itemBuilder: (context, index) => Container(
+            width: 80,
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: Colors.grey.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ),
+        ),
+      );
+    }
+
     if (chatProvider.subjects.isEmpty) return const SizedBox.shrink();
 
     return Container(
