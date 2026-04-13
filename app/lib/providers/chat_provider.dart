@@ -90,8 +90,8 @@ class ChatProvider extends ChangeNotifier {
     _greetingGenerated = true;
     notifyListeners();
 
-    // 🕵️ SILENT REQUEST: Trigger a clean, single-line professional first impression
-    const prompt = "Generate a single, very short, and punchy professional academic greeting to start the session (e.g., 'Ready to dive into your studies? let's get started.'). Strictly one short line only. No long intros.";
+    // 🕵️ SILENT REQUEST: Trigger a professional introduction as the Academic Mentor
+    const prompt = "Introduce yourself as the Academic Mentor. Generate a single, very short, and calm Zen-like professional greeting. Strictly one short line only. Vibe: Specialized LMS Assistant.";
     await _getAIResponse(prompt, []);
   }
 
@@ -261,7 +261,13 @@ class ChatProvider extends ChangeNotifier {
         final trimmed = line.trim();
         if (trimmed.startsWith('data: ')) {
           final dataStr = trimmed.substring(6).trim();
-          if (dataStr == '[DONE]') break;
+          if (dataStr == '[DONE]') {
+            // Remove caret on completion
+            if (assistantMsg != null) {
+              assistantMsg!.text = assistantMsg!.text.replaceAll(' ▌', '');
+            }
+            break;
+          }
 
           try {
             final decoded = json.decode(dataStr);
@@ -269,22 +275,20 @@ class ChatProvider extends ChangeNotifier {
             
             if (choices != null && choices.isNotEmpty) {
               final delta = choices[0]['delta'];
-              
-              // Only display final 'content' (hides the reasoning/thinking logic)
               final content = delta?['content'];
 
               if (content != null && content.isNotEmpty) {
                 if (assistantMsg == null) {
                   _isTyping = false;
-                  assistantMsg = Message(id: 'ai_${DateTime.now()}', text: content, isUser: false);
-                  _messages.add(assistantMsg);
+                  assistantMsg = Message(id: 'ai_${DateTime.now()}', text: content + ' ▌', isUser: false);
+                  _messages.add(assistantMsg!);
                 } else {
-                  assistantMsg.text += content;
+                  // Remove old caret, add content, add new caret
+                  assistantMsg!.text = assistantMsg!.text.replaceAll(' ▌', '') + content + ' ▌';
                 }
                 
-                // PERFORMANCE FIX: Only update UI every few chunks to prevent lagging
                 final now = DateTime.now().millisecondsSinceEpoch;
-                if (now - _lastNotifyTime > 50) { // Update every 50ms
+                if (now - _lastNotifyTime > 40) { // Slightly faster for smoother caret
                   _lastNotifyTime = now;
                   notifyListeners();
                 }
@@ -295,7 +299,10 @@ class ChatProvider extends ChangeNotifier {
           }
         }
       }
-      // Ensure the final chunk is always rendered
+      // Final cleanup: ensure caret is gone
+      if (assistantMsg != null) {
+        assistantMsg!.text = assistantMsg!.text.replaceAll(' ▌', '');
+      }
       notifyListeners();
     } catch (e) {
       _isTyping = false;

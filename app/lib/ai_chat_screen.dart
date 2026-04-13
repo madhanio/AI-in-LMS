@@ -94,7 +94,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
               final messages = chatProvider.messages;
               final isTyping = chatProvider.isTyping;
-              final showSuggestions = messages.length <= 1 && !isTyping;
+              // 🧠 SMART UI: Only show suggestions for first-time rookies (Empty Messages + Empty History)
+              final showSuggestions = messages.isEmpty && chatProvider.history.isEmpty && !isTyping;
               final extraWidgets = (isTyping ? 1 : 0) + (showSuggestions ? 1 : 0);
 
               return Column(
