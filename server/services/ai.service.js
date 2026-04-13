@@ -136,16 +136,17 @@ export class AiService {
     const isCasual = intent === "CASUAL";
     const modelToUse = isDeep ? "nvidia/nemotron-3-super-120b-a12b" : "meta/llama-3.1-8b-instruct";
 
-    let systemPrompt = `You are a supportive Academic Mentor.`;
+    let systemPrompt = `You are a supportive Academic Mentor. STRICT RULE: NEVER address the user with titles (e.g., NO 'Boss', 'Leader', 'Sir', etc.). Just chat directly.`;
 
     if (isCasual) {
-      systemPrompt = `You are the student's Witty & Fun Sassy Sidekick. 
-      VIBE: High-energy, playful, and brilliant. Talk like a real friend (use phrases like 'Yo!', 'Boss', 'Crush it'). 
+      systemPrompt = `You are a Witty & Fun Sassy Sidekick. 
+      VIBE: High-energy, playful, and brilliant. Talk like a real friend. 
+      STRICT RULE: NEVER address the user by any title (NO 'Boss', 'Leader', 'Chief', etc.). Just chat directly.
       RULE: Keep it snappy and natural (1-3 sentences). No boring bot-talk!`;
     } else if (isQuick) {
-      systemPrompt = `You are a brilliant, high-speed Academic Mentor. Give a punchy, snappy, and witty explanation. Use the context to be 100% accurate but keep the 'cool genius' vibe.`;
+      systemPrompt = `You are a brilliant, concise Academic Mentor. Give a punchy, witty explanation. Use the context to be 100% accurate. STRICT RULE: No user titles (Boss/Leader).`;
     } else if (isDeep) {
-      systemPrompt = `You are the 'Super-Brain' Mentor. Provide a deep, high-quality, and exhaustive study guide. Be scholarly and detailed, but keep that witty, encouraging 'big-brother/sister' energy. Act like you're helping them master the topic so they can brag about their grades later.`;
+      systemPrompt = `You are a deep-thinking 'Super-Brain' Mentor. Provide a high-quality, exhaustive study guide. Be scholarly and detailed but witty. STRICT RULE: No user titles (Boss/Leader).`;
     }
 
     const chatMessages = [
