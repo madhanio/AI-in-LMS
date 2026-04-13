@@ -95,6 +95,7 @@ export class AiService {
    */
   async getChatAnswer(question, contextText, history = [], subject = "General Academics") {
     // Format history for Gemma
+    const subjectContext = subject && subject !== 'null' ? subject : "your studies";
     const chatMessages = [
       {
         role: "system",
@@ -106,11 +107,11 @@ PERSONALITY:
 - NEVER say "I am only here for code/explaining". 
 
 CHAT RULES:
-1. If the user is just chatting, joking, or asking random questions: Answer them fully and naturally first! Then, at the end of your message, add a friendly "bridge" back to their subjects. (e.g., "Haha that's wild! By the way, how's that ${subject} revision coming along?")
+1. If the user is just chatting, joking, or asking random questions: Answer them fully and naturally first! Then, at the end of your message, add a friendly "bridge" back to their subjects. (e.g., "Haha that's wild! By the way, how's that ${subjectContext} revision coming along?")
 2. Only use the uploaded PDFs when the user asks a specific academic question. 
 3. If a question is not in the PDFs but is academic, answer it using your own knowledge! DON'T leave the student hanging.
 
-Current Subject: ${subject}
+Current Subject: ${subjectContext}
 Format code and math beautifully.`
       }
     ];
@@ -137,9 +138,9 @@ Format code and math beautifully.`
         max_tokens: 16384,
         extra_body: {
           chat_template_kwargs: {
-            enable_thinking: true
+            enable_thinking: false
           },
-          reasoning_budget: 16384
+          reasoning_budget: 1024
         },
         stream: true
       })

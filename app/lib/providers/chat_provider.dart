@@ -23,6 +23,7 @@ class ChatProvider extends ChangeNotifier {
   String? get selectedSubject => _selectedSubject;
   bool get isStreaming => _isStreaming;
   bool get isTyping => _isTyping;
+  int _lastNotifyTime = 0;
 
   // Base URL configuration
   final String _baseUrl = 'https://ai-in-lms.onrender.com/api';
@@ -142,23 +143,27 @@ class ChatProvider extends ChangeNotifier {
             final decoded = json.decode(dataStr);
             final choices = decoded['choices'] as List?;
             
-            // Safety check: ensure choices is not null or empty
             if (choices != null && choices.isNotEmpty) {
               final delta = choices[0]['delta'];
               
-              // Check for both content and reasoning_content (Thinking)
-              final content = delta?['content'] ?? delta?['reasoning_content'];
+              // Only display final 'content' (hides the reasoning/thinking logic)
+              final content = delta?['content'];
 
               if (content != null && content.isNotEmpty) {
                 if (assistantMsg == null) {
-                  // First chunk arrived (could be reasoning)! 
                   _isTyping = false;
                   assistantMsg = Message(id: 'ai_${DateTime.now()}', text: content, isUser: false);
                   _messages.add(assistantMsg);
                 } else {
                   assistantMsg.text += content;
                 }
-                notifyListeners();
+                
+                // PERFORMANCE FIX: Only update UI every few chunks to prevent lagging
+                final now = DateTime.now().millisecondsSinceEpoch;
+                if (now - _lastNotifyTime > 50) { // Update every 50ms
+                  _lastNotifyTime = now;
+                  notifyListeners();
+                }
               }
             }
           } catch (e) {
@@ -166,6 +171,8 @@ class ChatProvider extends ChangeNotifier {
           }
         }
       }
+      // Ensure the final chunk is always rendered
+      notifyListeners();
     } catch (e) {
       _isTyping = false;
       _messages.add(Message(id: 'err_${DateTime.now()}', text: 'Something went wrong. Try again.', isUser: false));
