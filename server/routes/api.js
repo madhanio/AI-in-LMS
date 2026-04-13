@@ -113,28 +113,26 @@ router.post('/query', async (req, res) => {
 
     console.log(`Querying ${subject || 'global'} for: ${question}`);
     
-    // Skip expansion/embedding for short greetings or single words
-    let expandedQuery = question;
-    let queryEmbedding;
-
-    if (question.trim().split(/\s+/).length >= 3) {
-      console.log(`Expanding query...`);
-      expandedQuery = await aiService.expandQuery(question);
-      console.log(`Expanded query: ${expandedQuery}`);
-      queryEmbedding = await aiService.getEmbedding(expandedQuery, "query");
-    } else {
-      console.log(`Short query detected, skipping expansion.`);
-      queryEmbedding = await aiService.getEmbedding(question, "query");
-    }
-
-    // Get chunks (include global calendar context)
-    const searchSubjects = subject ? [subject, '__CALENDAR__'] : ['__CALENDAR__'];
-    const allChunks = await storageService.getAllChunks(searchSubjects);
+    // SMART INTENT DETECTION: Skip heavy lifting (Expansion/Search) for casual/meta talk
+    const academicKeywords = ['explain', 'what', 'how', 'concept', 'solve', 'theory', 'notes', 'syllabus', 'exam', 'test', 'subject', 'lecture', 'past paper'];
+    const isAcademic = academicKeywords.some(word => question.toLowerCase().includes(word));
     
     let finalContext = "No specific lecture notes found for this query.";
-    let retrievedCount = 0;
+    if (isAcademic) {
+      if (question.trim().split(/\s+/).length >= 3) {
+        console.log(`Expanding academic query...`);
+        expandedQuery = await aiService.expandQuery(question);
+        queryEmbedding = await aiService.getEmbedding(expandedQuery, "query");
+      } else {
+        console.log(`Short academic query detected, skipping expansion.`);
+        queryEmbedding = await aiService.getEmbedding(question, "query");
+      }
 
-    if (allChunks.length > 0) {
+      // Get chunks (include global calendar context)
+      const searchSubjects = subject ? [subject, '__CALENDAR__'] : ['__CALENDAR__'];
+      const allChunks = await storageService.getAllChunks(searchSubjects);
+      
+      if (allChunks.length > 0) {
       // 4. Hybrid Ranking (Semantic + Keyword)
       const keywords = expandedQuery.toLowerCase().split(/\s+/).filter(w => w.length > 3);
       const scoredChunks = allChunks.map(c => {
