@@ -85,8 +85,8 @@ class ChatProvider extends ChangeNotifier {
     _greetingGenerated = true;
     notifyListeners();
 
-    // 🕵️ SILENT REQUEST: Trigger the persona without showing a user bubble
-    const prompt = "Yo! Give me a super fresh, witty 1-sentence greeting to start our study session. Just one sentence, acting as my sassy mentor.";
+    // 🕵️ SILENT REQUEST: Trigger a professional first impression
+    const prompt = "Generate a professional, supportive, and welcoming 1-sentence academic greeting to start a new study session. No casual slang for this first message.";
     await _getAIResponse(prompt, []);
   }
 
