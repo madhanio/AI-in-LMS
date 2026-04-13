@@ -131,26 +131,30 @@ Format code and math beautifully.`
     // Choose the model: Meta/Casual talk = Llama 8B (Instant); Academic = Nemotron 120B (Deep)
     const modelToUse = isAcademic ? "nvidia/nemotron-3-super-120b-a12b" : "meta/llama-3.1-8b-instruct";
 
+    const requestBody = {
+      model: modelToUse,
+      messages: chatMessages,
+      temperature: isAcademic ? 1.0 : 0.7,
+      top_p: 0.9,
+      max_tokens: isAcademic ? 16384 : 1024,
+      stream: true
+    };
+
+    // Only add reasoning/thinking parameters for the massive 120B model (the only one that supports it)
+    if (modelToUse === "nvidia/nemotron-3-super-120b-a12b") {
+      requestBody.extra_body = {
+        chat_template_kwargs: { enable_thinking: false },
+        reasoning_budget: 1024
+      };
+    }
+
     const response = await fetch(`${BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
          "Authorization": `Bearer ${NVIDIA_API_KEY}`,
          "Content-Type": "application/json"
       },
-      body: JSON.stringify({
-        model: modelToUse,
-        messages: chatMessages,
-        temperature: isAcademic ? 1.0 : 0.7,
-        top_p: 0.9,
-        max_tokens: isAcademic ? 16384 : 1024,
-        extra_body: {
-          chat_template_kwargs: {
-            enable_thinking: false
-          },
-          reasoning_budget: 1024
-        },
-        stream: true
-      })
+      body: JSON.stringify(requestBody)
     });
 
 
