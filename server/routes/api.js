@@ -131,14 +131,14 @@ router.post('/query', async (req, res) => {
     const searchSubjects = subject ? [subject, '__CALENDAR__'] : ['__CALENDAR__'];
     const allChunks = await storageService.getAllChunks(searchSubjects);
     
-    if (allChunks.length === 0) {
-      return res.json({ answer: "Please upload some material for this subject first." });
-    }
+    let finalContext = "No specific lecture notes found for this query.";
+    let retrievedCount = 0;
 
-    // 4. Hybrid Ranking (Semantic + Keyword)
-    const keywords = expandedQuery.toLowerCase().split(/\s+/).filter(w => w.length > 3);
-    const scoredChunks = allChunks.map(c => {
-      const semanticScore = cosineSimilarity(queryEmbedding, c.embedding);
+    if (allChunks.length > 0) {
+      // 4. Hybrid Ranking (Semantic + Keyword)
+      const keywords = expandedQuery.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+      const scoredChunks = allChunks.map(c => {
+        const semanticScore = cosineSimilarity(queryEmbedding, c.embedding);
       
       // Basic keyword frequency boost
       const textLower = c.text.toLowerCase();
@@ -164,7 +164,6 @@ router.post('/query', async (req, res) => {
     const thresholdChunks = scoredChunks.filter(c => c.score > 0.4);
 
     // Setup context for AI
-    let finalContext = "";
     if (thresholdChunks.length > 0) {
       const topChunks = thresholdChunks.slice(0, topK);
       finalContext = topChunks.map(c => {
