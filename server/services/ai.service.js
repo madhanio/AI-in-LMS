@@ -10,7 +10,7 @@ export class AiService {
    */
   async getEmbeddings(texts, inputType = "passage") {
     // NVIDIA recommended max batch size is 50 for embeddings
-    const BATCH_SIZE = 50; 
+    const BATCH_SIZE = 50;
     let allEmbeddings = [];
 
     // Ensure it's an array
@@ -18,7 +18,7 @@ export class AiService {
 
     for (let i = 0; i < textArray.length; i += BATCH_SIZE) {
       const batch = textArray.slice(i, i + BATCH_SIZE);
-      
+
       const response = await fetch(`${BASE_URL}/embeddings`, {
         method: "POST",
         headers: {
@@ -33,11 +33,11 @@ export class AiService {
           truncate: "NONE"
         })
       });
-      
+
       if (!response.ok) {
-         throw new Error(`Embedding Error: ${await response.text()}`);
+        throw new Error(`Embedding Error: ${await response.text()}`);
       }
-      
+
       const data = await response.json();
       // Keep order of embeddings
       allEmbeddings.push(...data.data.map(d => d.embedding));
@@ -50,7 +50,7 @@ export class AiService {
    * Generates embedding for single text (Backwards compatibility)
    */
   async getEmbedding(text, inputType = "passage") {
-      return this.getEmbeddings(text, inputType);
+    return this.getEmbeddings(text, inputType);
   }
 
   /**
@@ -61,8 +61,8 @@ export class AiService {
       const response = await fetch(`${BASE_URL}/chat/completions`, {
         method: "POST",
         headers: {
-           "Authorization": `Bearer ${NVIDIA_API_KEY}`,
-           "Content-Type": "application/json"
+          "Authorization": `Bearer ${NVIDIA_API_KEY}`,
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
           model: "meta/llama-3.1-8b-instruct",
@@ -84,7 +84,7 @@ export class AiService {
       const data = await response.json();
       const expanded = data.choices[0].message.content.trim();
       return expanded;
-    } catch(e) {
+    } catch (e) {
       console.error("Query Expansion Error:", e.message);
       return question;
     }
@@ -98,18 +98,18 @@ export class AiService {
       const response = await fetch(`${BASE_URL}/chat/completions`, {
         method: "POST",
         headers: {
-           "Authorization": `Bearer ${NVIDIA_API_KEY}`,
-           "Content-Type": "application/json"
+          "Authorization": `Bearer ${NVIDIA_API_KEY}`,
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
           model: "meta/llama-3.1-8b-instruct",
           messages: [
-            { 
-              role: "system", 
+            {
+              role: "system",
               content: `Classify user intent into exactly one category:
               - 'CASUAL': Greetings, jokes, identity, or meta-talk.
               - 'STUDY_QUICK': Simple definitions, facts, or short academic questions (e.g., 'What is X?').
-              - 'STUDY_DEEP': Complex explanations, 'how it works', comparisons, or deep reasoning.` 
+              - 'STUDY_DEEP': Complex explanations, 'how it works', comparisons, or deep reasoning.`
             },
             { role: "user", content: question }
           ],
@@ -135,23 +135,25 @@ export class AiService {
     const isQuick = intent === "STUDY_QUICK";
     const isCasual = intent === "CASUAL";
     const modelToUse = isDeep ? "nvidia/nemotron-3-super-120b-a12b" : "meta/llama-3.1-8b-instruct";
-    
+
     let systemPrompt = `You are a supportive Academic Mentor.`;
-    
+
     if (isCasual) {
-      systemPrompt = `You are a snappy Academic Mentor. The user is just chatting. Keep it natural and brief (1-3 sentences).`;
+      systemPrompt = `You are the student's Witty & Fun Sassy Sidekick. 
+      VIBE: High-energy, playful, and brilliant. Talk like a real friend (use phrases like 'Yo!', 'Boss', 'Crush it'). 
+      RULE: Keep it snappy and natural (1-3 sentences). No boring bot-talk!`;
     } else if (isQuick) {
-      systemPrompt = `You are a helpful Academic Assistant. Provide a clear, standard-length explanation. Not too short, but stay efficient and avoid rambling. Use the provided context to answer accurately.`;
+      systemPrompt = `You are a brilliant, high-speed Academic Mentor. Give a punchy, snappy, and witty explanation. Use the context to be 100% accurate but keep the 'cool genius' vibe.`;
     } else if (isDeep) {
-      systemPrompt = `You are a deep-thinking Academic Scholar. Provide an in-depth, high-quality explanation. Be detailed and thorough, but stay focused on the core question so the answer is comprehensive yet readable (not an endless essay). Use examples from the context.`;
+      systemPrompt = `You are the 'Super-Brain' Mentor. Provide a deep, high-quality, and exhaustive study guide. Be scholarly and detailed, but keep that witty, encouraging 'big-brother/sister' energy. Act like you're helping them master the topic so they can brag about their grades later.`;
     }
 
     const chatMessages = [
       { role: "system", content: systemPrompt },
       ...history,
-      { 
-        role: "user", 
-        content: isCasual ? question : `Context:\n${contextText}\n\nStudent Question: ${question}` 
+      {
+        role: "user",
+        content: isCasual ? question : `Context:\n${contextText}\n\nStudent Question: ${question}`
       }
     ];
 
@@ -174,15 +176,15 @@ export class AiService {
     const response = await fetch(`${BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
-         "Authorization": `Bearer ${NVIDIA_API_KEY}`,
-         "Content-Type": "application/json"
+        "Authorization": `Bearer ${NVIDIA_API_KEY}`,
+        "Content-Type": "application/json"
       },
       body: JSON.stringify(requestBody)
     });
 
 
     if (!response.ok) {
-       throw new Error(`Chat API Error: ${await response.text()}`);
+      throw new Error(`Chat API Error: ${await response.text()}`);
     }
 
     return response.body; // Returns the readable stream
