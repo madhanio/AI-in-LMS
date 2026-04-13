@@ -229,4 +229,20 @@ router.delete('/subjects/:name', authenticateAdmin, async (req, res) => {
   }
 });
 
+/**
+ * GET /prompts - Fetch dynamic study suggestions
+ */
+router.get('/prompts', (req, res) => {
+  const suggestions = [
+    "Summarize my last lecture like I'm 5 👶",
+    "Quiz me on the hardest part of this subject 🧠",
+    "Give me 3 'must-know' exam tips ✍️",
+    "How does this relate to real-life jobs? 💼",
+    "Turn my notes into a funny story 📖",
+    "Compare the main concepts for me ⚖️"
+  ];
+  // Shuffle or return a subset
+  res.json({ suggestions: suggestions.sort(() => 0.5 - Math.random()).slice(0, 4) });
+});
+
 export default router;

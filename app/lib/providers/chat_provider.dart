@@ -5,23 +5,22 @@ import 'package:http/http.dart' as http;
 import '../models/message.dart';
 
 class ChatProvider extends ChangeNotifier {
-  final List<Message> _messages = [
-    Message(
-      id: 'initial',
-      text: 'Hello! I am your LMS Assistant. Choose a subject below and let\'s start learning!',
-      isUser: false,
-    )
-  ];
+  final List<Message> _messages = [];
   
   List<String> _subjects = [];
+  List<String> _suggestions = [];
   bool _isLoadingSubjects = false;
+  bool _isLoadingSuggestions = false;
   String? _selectedSubject;
   bool _isStreaming = false;
   bool _isTyping = false;
-  
+  bool _greetingGenerated = false;
+
   List<Message> get messages => _messages;
   List<String> get subjects => _subjects;
+  List<String> get suggestions => _suggestions;
   bool get isLoadingSubjects => _isLoadingSubjects;
+  bool get isLoadingSuggestions => _isLoadingSuggestions;
   String? get selectedSubject => _selectedSubject;
   bool get isStreaming => _isStreaming;
   bool get isTyping => _isTyping;
@@ -35,11 +34,10 @@ class ChatProvider extends ChangeNotifier {
   }
 
   Future<void> fetchSubjects() async {
-    // Only fetch if we don't have them yet to save time
-    if (_subjects.isNotEmpty) return;
-
     _isLoadingSubjects = true;
     notifyListeners();
+    // Also trigger suggestions to load in parallel
+    fetchSuggestions();
 
     try {
       final res = await http.get(Uri.parse('$_baseUrl/subjects')).timeout(const Duration(seconds: 5));
@@ -53,6 +51,52 @@ class ChatProvider extends ChangeNotifier {
       _isLoadingSubjects = false;
       notifyListeners();
     }
+  }
+
+  Future<void> fetchSuggestions() async {
+    _isLoadingSuggestions = true;
+    notifyListeners();
+
+    try {
+      final res = await http.get(Uri.parse('$_baseUrl/prompts')).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        _suggestions = List<String>.from(data['suggestions']);
+      }
+    } catch (e) {
+      debugPrint('Error fetching suggestions: $e');
+      // Fallback suggestions
+      _suggestions = [
+        "What's on my study schedule? 📅",
+        "Summarize my top PDF 📄",
+        "Give me a quick quiz 🧠"
+      ];
+    } finally {
+      _isLoadingSuggestions = false;
+      notifyListeners();
+    }
+  }
+
+  /// Generates a fresh, unique greeting for a new session
+  Future<void> generateInitialGreeting() async {
+    if (_messages.isNotEmpty || _isTyping) return;
+    
+    _isTyping = true;
+    _greetingGenerated = true;
+    notifyListeners();
+
+    // 🕵️ SILENT REQUEST: Trigger the persona without showing a user bubble
+    const prompt = "Yo! Give me a super fresh, witty 1-sentence greeting to start our study session. Just one sentence, acting as my sassy mentor.";
+    await _getAIResponse(prompt, []);
+  }
+
+  /// Clears the current chat and starts a fresh AI session
+  void resetChat() {
+    _messages.clear();
+    _selectedSubject = null;
+    _greetingGenerated = false;
+    notifyListeners();
+    generateInitialGreeting();
   }
 
   void selectSubject(String subject) {
@@ -91,7 +135,7 @@ class ChatProvider extends ChangeNotifier {
     _isStreaming = true;
     _isTyping = true;
     
-    // Add user message
+    // Add user message to UI
     _messages.add(Message(
       id: DateTime.now().toString(),
       text: text,
@@ -114,9 +158,14 @@ class ChatProvider extends ChangeNotifier {
       'content': m.text
     }).toList();
 
-    String finalQuestion = text;
+    await _getAIResponse(text, historyMap);
+  }
+
+  /// ⚡ Core AI Interaction Engine (Private)
+  Future<void> _getAIResponse(String question, List<Map<String, dynamic>> historyMap) async {
+    String finalQuestion = question;
     if (_selectedSubject != null) {
-      finalQuestion = "[Subject: $_selectedSubject] $text";
+      finalQuestion = "[Subject: $_selectedSubject] $question";
     }
 
     Message? assistantMsg;

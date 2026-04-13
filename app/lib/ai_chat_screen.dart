@@ -21,7 +21,16 @@ class _AiChatScreenState extends State<AiChatScreen> {
   @override
   void initState() {
     super.initState();
-    // Auto-scroll listener handled in build/didUpdateWidget or via Provider notifications
+    // 🚀 FRESH START: Fetch subjects and generate a unique AI greeting on open
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+      chatProvider.fetchSubjects();
+      
+      // Only generate a greeting if this is a fresh start (empty chat)
+      if (chatProvider.messages.isEmpty) {
+        chatProvider.generateInitialGreeting();
+      }
+    });
   }
 
   @override
@@ -60,6 +69,14 @@ class _AiChatScreenState extends State<AiChatScreen> {
              ),
           ),
           centerTitle: true,
+          actions: [
+            IconButton(
+              tooltip: 'New Chat',
+              icon: const Icon(Icons.add_circle_outline, color: Color(0xFF1C1C1E), size: 22),
+              onPressed: () => context.read<ChatProvider>().resetChat(),
+            ),
+            const SizedBox(width: 8),
+          ],
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(1),
             child: Container(color: Colors.grey.shade200, height: 1),
