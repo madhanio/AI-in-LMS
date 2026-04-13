@@ -124,9 +124,12 @@ Format code and math beautifully.`
       content: `Document Context:\n${contextText}\n\nStudent Question: ${question}`
     });
 
-    // SMART ROUTING: Use a small, fast model for greetings; use the big brain for real questions.
-    const isGreeting = question.trim().split(/\s+/).length <= 2;
-    const modelToUse = isGreeting ? "meta/llama-3.1-8b-instruct" : "nvidia/nemotron-3-super-120b-a12b";
+    // SMART INTENT DETECTION: Is this a real study question or just chatter?
+    const academicKeywords = ['explain', 'what', 'how', 'concept', 'solve', 'theory', 'notes', 'pdf', 'syllabus', 'exam', 'test', 'subject', 'lecture'];
+    const isAcademic = academicKeywords.some(word => question.toLowerCase().includes(word)) || question.trim().split(/\s+/).length > 6;
+    
+    // Choose the model: Meta/Casual talk = Llama 8B (Instant); Academic = Nemotron 120B (Deep)
+    const modelToUse = isAcademic ? "nvidia/nemotron-3-super-120b-a12b" : "meta/llama-3.1-8b-instruct";
 
     const response = await fetch(`${BASE_URL}/chat/completions`, {
       method: "POST",
@@ -137,9 +140,9 @@ Format code and math beautifully.`
       body: JSON.stringify({
         model: modelToUse,
         messages: chatMessages,
-        temperature: 0.8,
+        temperature: isAcademic ? 1.0 : 0.7,
         top_p: 0.9,
-        max_tokens: isGreeting ? 1024 : 16384,
+        max_tokens: isAcademic ? 16384 : 1024,
         extra_body: {
           chat_template_kwargs: {
             enable_thinking: false
