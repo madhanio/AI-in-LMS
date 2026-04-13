@@ -7,6 +7,7 @@ import 'widgets/typing_indicator.dart';
 import 'widgets/subject_chip_row.dart';
 import 'widgets/input_bar.dart';
 import 'widgets/suggestion_cards.dart';
+import 'widgets/history_drawer.dart';
 
 class AiChatScreen extends StatefulWidget {
   const AiChatScreen({super.key});
@@ -17,6 +18,7 @@ class AiChatScreen extends StatefulWidget {
 
 class _AiChatScreenState extends State<AiChatScreen> {
   final ScrollController _scrollController = ScrollController();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
@@ -52,13 +54,15 @@ class _AiChatScreenState extends State<AiChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: const Color(0xFFF5F5F7),
+      drawer: const HistoryDrawer(),
       appBar: AppBar(
           backgroundColor: Colors.white,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF1C1C1E), size: 18),
-            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.menu, color: Color(0xFF1C1C1E), size: 22),
+            onPressed: () => _scaffoldKey.currentState?.openDrawer(),
           ),
           title: Text(
              'Academic Mentor',

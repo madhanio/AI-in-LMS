@@ -2,10 +2,13 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/message.dart';
+import '../models/chat_session.dart';
 
 class ChatProvider extends ChangeNotifier {
   final List<Message> _messages = [];
+  final List<ChatSession> _history = [];
   
   List<String> _subjects = [];
   List<String> _suggestions = [];
@@ -17,6 +20,7 @@ class ChatProvider extends ChangeNotifier {
   bool _greetingGenerated = false;
 
   List<Message> get messages => _messages;
+  List<ChatSession> get history => _history;
   List<String> get subjects => _subjects;
   List<String> get suggestions => _suggestions;
   bool get isLoadingSubjects => _isLoadingSubjects;
@@ -31,6 +35,7 @@ class ChatProvider extends ChangeNotifier {
 
   ChatProvider() {
     fetchSubjects();
+    _loadHistory();
   }
 
   Future<void> fetchSubjects() async {
@@ -90,13 +95,73 @@ class ChatProvider extends ChangeNotifier {
     await _getAIResponse(prompt, []);
   }
 
+  /// 🏛️ ARCHIVE LOGIC: Saves the current session before clearing
+  Future<void> _archiveCurrentSession() async {
+    if (_messages.length <= 1) return; // Don't save empty/greeting-only chats
+
+    // Generate a title from the first user message
+    String title = "New Session";
+    final firstUserMsg = _messages.firstWhere((m) => m.isUser, orElse: () => _messages[0]);
+    title = firstUserMsg.text.length > 30 
+        ? "${firstUserMsg.text.substring(0, 27)}..." 
+        : firstUserMsg.text;
+
+    final session = ChatSession(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      title: title,
+      messages: List.from(_messages),
+      timestamp: DateTime.now(),
+      subject: _selectedSubject,
+    );
+
+    _history.insert(0, session);
+    await _saveHistory();
+  }
+
   /// Clears the current chat and starts a fresh AI session
-  void resetChat() {
+  void resetChat() async {
+    await _archiveCurrentSession();
     _messages.clear();
     _selectedSubject = null;
     _greetingGenerated = false;
     notifyListeners();
     generateInitialGreeting();
+  }
+
+  /// Loads a past session from history
+  void loadSession(ChatSession session) {
+    _messages.clear();
+    _messages.addAll(session.messages);
+    _selectedSubject = session.subject;
+    _greetingGenerated = true; // Prevents re-greeting on load
+    notifyListeners();
+  }
+
+  // --- PERSISTENCE ---
+  
+  Future<void> _loadHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final historyStr = prefs.getString('chat_history');
+      if (historyStr != null) {
+        final List<dynamic> decoded = json.decode(historyStr);
+        _history.clear();
+        _history.addAll(decoded.map((json) => ChatSession.fromJson(json)).toList());
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint("Error loading history: $e");
+    }
+  }
+
+  Future<void> _saveHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final historyStr = json.encode(_history.map((s) => s.toJson()).toList());
+      await prefs.setString('chat_history', historyStr);
+    } catch (e) {
+      debugPrint("Error saving history: $e");
+    }
   }
 
   void selectSubject(String subject) {

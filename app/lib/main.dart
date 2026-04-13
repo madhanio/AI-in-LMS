@@ -8,7 +8,10 @@ void main() {
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => ChatProvider()),
+        ChangeNotifierProvider(
+          create: (_) => ChatProvider(),
+          lazy: false, // 🚀 PERFORMANCE FIX: Pre-warm the AI brain for instant transition
+        ),
       ],
       child: const MyApp(),
     ),
