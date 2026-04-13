@@ -128,7 +128,7 @@ export class AiService {
     // Strict instructions for brevity in casual mode
     const systemPrompt = isAcademic 
       ? `You are a supportive Academic Mentor. Explain topics clearly using the context provided. Math/Code should be formatted beautifully.`
-      : `You are a snappy Academic Mentor. The user is just chatting. BE EXTREMELY BRIEF (max 2 sentences). Give a friendly answer and bridge back to their studies.`;
+      : `You are a snappy Academic Mentor. The user is just chatting. BE EXTREMELY BRIEF (max 2 sentences) and keep it natural.`;
 
     const chatMessages = [
       { role: "system", content: systemPrompt },
