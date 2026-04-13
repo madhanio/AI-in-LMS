@@ -131,14 +131,19 @@ export class AiService {
    * Generates chat answer based on context as a stream
    */
   async getChatAnswer(question, contextText, history = [], subject = "General Academics", intent = "STUDY_QUICK") {
-    // 120B is only for deep study. Everything else (including quick study) uses the fast 8B.
     const isDeep = intent === "STUDY_DEEP";
+    const isQuick = intent === "STUDY_QUICK";
     const isCasual = intent === "CASUAL";
     const modelToUse = isDeep ? "nvidia/nemotron-3-super-120b-a12b" : "meta/llama-3.1-8b-instruct";
     
-    let systemPrompt = `You are a supportive Academic Mentor. Explain topics clearly using the context.`;
+    let systemPrompt = `You are a supportive Academic Mentor.`;
+    
     if (isCasual) {
       systemPrompt = `You are a snappy Academic Mentor. The user is just chatting. BE EXTREMELY BRIEF (max 2 sentences) and keep it natural.`;
+    } else if (isQuick) {
+      systemPrompt = `You are a concise Academic Assistant. Give a VERY CONCISED, punchy definition or answer (max 3-4 sentences). Don't ramble. Use the provided context.`;
+    } else if (isDeep) {
+      systemPrompt = `You are a deep-thinking Academic Scholar. Provide VERY LARGE, detailed, and comprehensive outputs. Explain concepts in depth, use examples from the context, and act like you are writing a thorough study guide or essay. Be exhaustive.`;
     }
 
     const chatMessages = [
