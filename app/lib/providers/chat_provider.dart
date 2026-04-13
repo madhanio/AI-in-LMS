@@ -85,8 +85,8 @@ class ChatProvider extends ChangeNotifier {
     _greetingGenerated = true;
     notifyListeners();
 
-    // 🕵️ SILENT REQUEST: Trigger a professional first impression
-    const prompt = "Generate a professional, supportive, and welcoming 1-sentence academic greeting to start a new study session. No casual slang for this first message.";
+    // 🕵️ SILENT REQUEST: Trigger a clean, single-line professional first impression
+    const prompt = "Generate a single, very short, and punchy professional academic greeting to start the session (e.g., 'Ready to dive into your studies? let's get started.'). Strictly one short line only. No long intros.";
     await _getAIResponse(prompt, []);
   }
 
