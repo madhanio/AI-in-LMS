@@ -94,42 +94,29 @@ export class AiService {
    * Generates chat answer based on context as a stream
    */
   async getChatAnswer(question, contextText, history = [], subject = "General Academics") {
-    // Format history for Gemma
-    const subjectContext = subject && subject !== 'null' ? subject : "your studies";
+    // SMART INTENT DETECTION: Academic or Casual?
+    const lowerQ = question.toLowerCase();
+    const isAcademic = !['what can you do', 'who are you', 'help', 'hi', 'hey', 'hello', 'snap', 'chat'].some(p => lowerQ.includes(p)) && 
+                       (['explain', 'define', 'solve', 'theory', 'notes', 'syllabus', 'exam', 'concept'].some(t => lowerQ.includes(t)) || question.split(/\s+/).length > 8);
+    
+    // Choose model: Fast 8B for chatter, Heavy 120B for study
+    const modelToUse = isAcademic ? "nvidia/nemotron-3-super-120b-a12b" : "meta/llama-3.1-8b-instruct";
+    
     const chatMessages = [
       {
         role: "system",
-        content: `You are a supportive, high-energy Academic Mentor. 
-
-PERSONALITY: 
-- You are like a "cool older brother/sister" who is brilliant but down-to-earth.
-- Talk like a real person. Use casual, encouraging language. 
-- NEVER say "I am only here for code/explaining". 
-
-CHAT RULES:
-1. If the user is just chatting, joking, or asking random questions: Answer them fully and naturally first! Then, at the end of your message, add a friendly "bridge" back to their subjects. (e.g., "Haha that's wild! By the way, how's that ${subjectContext} revision coming along?")
-2. Only use the uploaded PDFs when the user asks a specific academic question. 
-3. If a question is not in the PDFs but is academic, answer it using your own knowledge! DON'T leave the student hanging.
-
-Current Subject: ${subjectContext}
-Format code and math beautifully.`
+        content: `You are a supportive Academic Mentor. 
+        RULE 1: For casual talk (e.g., 'What can you do?'), be EXTREMELY BRIEF (max 2 sentences). 
+        RULE 2: End EVERY casual response with a friendly bridge to their studies.`
+      },
+      ...history,
+      {
+        role: "user",
+        content: isAcademic 
+          ? `Subject: ${subject}\nContext:\n${contextText}\n\nStudent: ${question}`
+          : `Student asks a casual question: ${question}`
       }
     ];
-
-    // Add conversation memory
-    chatMessages.push(...history);
-
-    chatMessages.push({
-      role: "user",
-      content: `Document Context:\n${contextText}\n\nStudent Question: ${question}`
-    });
-
-    // SMART INTENT DETECTION: Is this a real study question or just chatter?
-    const academicKeywords = ['explain', 'what', 'how', 'concept', 'solve', 'theory', 'notes', 'pdf', 'syllabus', 'exam', 'test', 'subject', 'lecture'];
-    const isAcademic = academicKeywords.some(word => question.toLowerCase().includes(word)) || question.trim().split(/\s+/).length > 6;
-    
-    // Choose the model: Meta/Casual talk = Llama 8B (Instant); Academic = Nemotron 120B (Deep)
-    const modelToUse = isAcademic ? "nvidia/nemotron-3-super-120b-a12b" : "meta/llama-3.1-8b-instruct";
 
     const requestBody = {
       model: modelToUse,

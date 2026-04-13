@@ -112,8 +112,9 @@ router.post('/query', async (req, res) => {
 
     console.log(`Querying ${subject || 'global'} for: ${question}`);
 
-    const academicKeywords = ['explain', 'what', 'how', 'concept', 'solve', 'theory', 'notes', 'syllabus', 'exam', 'test', 'subject', 'lecture', 'past paper'];
-    const isAcademic = academicKeywords.some(word => question.toLowerCase().includes(word));
+    const lowerQ = question.toLowerCase();
+    const isAcademic = !['what can you do', 'who are you', 'help', 'hi', 'hey', 'hello', 'snap', 'chat'].some(p => lowerQ.includes(p)) && 
+                       (['explain', 'define', 'solve', 'theory', 'notes', 'syllabus', 'exam', 'concept'].some(t => lowerQ.includes(t)) || question.split(/\s+/).length > 8);
 
     if (isAcademic) {
       let queryVal = question;
