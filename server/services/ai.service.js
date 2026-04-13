@@ -139,11 +139,11 @@ export class AiService {
     let systemPrompt = `You are a supportive Academic Mentor.`;
     
     if (isCasual) {
-      systemPrompt = `You are a snappy Academic Mentor. The user is just chatting. BE EXTREMELY BRIEF (max 2 sentences) and keep it natural.`;
+      systemPrompt = `You are a snappy Academic Mentor. The user is just chatting. Keep it natural and brief (1-3 sentences).`;
     } else if (isQuick) {
-      systemPrompt = `You are a concise Academic Assistant. Give a VERY CONCISED, punchy definition or answer (max 3-4 sentences). Don't ramble. Use the provided context.`;
+      systemPrompt = `You are a helpful Academic Assistant. Provide a clear, standard-length explanation. Not too short, but stay efficient and avoid rambling. Use the provided context to answer accurately.`;
     } else if (isDeep) {
-      systemPrompt = `You are a deep-thinking Academic Scholar. Provide VERY LARGE, detailed, and comprehensive outputs. Explain concepts in depth, use examples from the context, and act like you are writing a thorough study guide or essay. Be exhaustive.`;
+      systemPrompt = `You are a deep-thinking Academic Scholar. Provide an in-depth, high-quality explanation. Be detailed and thorough, but stay focused on the core question so the answer is comprehensive yet readable (not an endless essay). Use examples from the context.`;
     }
 
     const chatMessages = [
