@@ -124,6 +124,10 @@ Format code and math beautifully.`
       content: `Document Context:\n${contextText}\n\nStudent Question: ${question}`
     });
 
+    // SMART ROUTING: Use a small, fast model for greetings; use the big brain for real questions.
+    const isGreeting = question.trim().split(/\s+/).length <= 2;
+    const modelToUse = isGreeting ? "meta/llama-3.1-8b-instruct" : "nvidia/nemotron-3-super-120b-a12b";
+
     const response = await fetch(`${BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
@@ -131,11 +135,11 @@ Format code and math beautifully.`
          "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "nvidia/nemotron-3-super-120b-a12b",
+        model: modelToUse,
         messages: chatMessages,
-        temperature: 1,
-        top_p: 0.95,
-        max_tokens: 16384,
+        temperature: 0.8,
+        top_p: 0.9,
+        max_tokens: isGreeting ? 1024 : 16384,
         extra_body: {
           chat_template_kwargs: {
             enable_thinking: false
