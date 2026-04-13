@@ -159,10 +159,14 @@ router.post('/query', async (req, res) => {
 
     const stream = await aiService.getChatAnswer(question, finalContext, history, subject, intent);
     
+    // Set headers for streaming (Critical for Render/Proxy stability)
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('X-Accel-Buffering', 'no'); 
     res.flushHeaders(); 
+
+    // 🔥 INSTANT PULSE: Trigger the UI typing state immediately to mask 'thinking' time
+    res.write(' ');
 
     const reader = stream.getReader();
     try {
