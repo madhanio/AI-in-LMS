@@ -235,9 +235,10 @@ router.post('/query', async (req, res) => {
           storageService.logQuery(question, topChunks.length, avgSim, Date.now() - startTime, subject);
         }
       }
-    } else {
-      console.log("Casual/Meta query detected. Skipping PDF search.");
     }
+  } else {
+    console.log("Casual/Meta query detected. Skipping PDF search.");
+  }
 
     const stream = await aiService.getChatAnswer(question, finalContext, history, subject || 'General', intent, rollNumber);
     
