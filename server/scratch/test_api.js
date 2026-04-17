@@ -10,7 +10,7 @@ const supabaseKey = process.env.SUPABASE_ANON_KEY;
 
 async function testConnection() {
   console.log("--- Diagnostic Test ---");
-  
+
   // 1. Test Supabase
   console.log("\nTesting Supabase Connection...");
   try {

@@ -9,112 +9,180 @@
     <style>
         :root {
             --primary: #FF8C00;
+            --primary-light: #FFA500;
             --primary-glow: rgba(255, 140, 0, 0.4);
             --bg-dark: #0A0A0F;
-            --card-bg: #15151E;
+            --card-bg: rgba(21, 21, 30, 0.7);
             --sidebar-bg: #0E0E16;
             --text-main: #FFFFFF;
             --text-dim: #9494A3;
             --border: rgba(255, 255, 255, 0.08);
             --success: #10B981;
             --error: #EF4444;
+            --glass: rgba(255, 255, 255, 0.03);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
             background-color: var(--bg-dark);
             color: var(--text-main);
             overflow: hidden;
+            background-image: 
+                radial-gradient(circle at 0% 0%, rgba(255, 140, 0, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 100% 100%, rgba(255, 140, 0, 0.05) 0%, transparent 50%);
         }
 
-        /* --- LOGIN SCREEN --- */
-        #loginScreen {
-            position: fixed; inset: 0;
-            background: radial-gradient(circle at top right, #1a1510, #0a0a0f);
-            display: flex; align-items: center; justify-content: center;
-            z-index: 1000;
-        }
-
-        .login-card {
+        /* --- UI COMPONENTS --- */
+        .glass-card {
             background: var(--card-bg);
-            padding: 3rem;
-            border-radius: 32px;
-            width: 100%; max-width: 440px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
             border: 1px solid var(--border);
-            text-align: center;
-            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+            border-radius: 24px; padding: 2rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-
-        .login-card h1 { font-weight: 800; font-size: 2rem; margin-bottom: 0.5rem; }
-        .login-card p { color: var(--text-dim); margin-bottom: 2.5rem; font-size: 0.95rem; }
+        .glass-card:hover {
+            border-color: rgba(255, 140, 0, 0.3);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
 
         /* --- DASHBOARD LAYOUT --- */
-        #mainDashboard { display: none; height: 100vh; display: flex; opacity: 0; transition: opacity 0.5s ease; }
+        #mainDashboard { 
+            display: none; 
+            height: 100vh; 
+            display: flex; 
+            opacity: 0; 
+            transition: opacity 0.5s ease; 
+        }
 
         .sidebar {
             width: 280px;
             background: var(--sidebar-bg);
             border-right: 1px solid var(--border);
             display: flex; flex-direction: column; padding: 2rem;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1001;
         }
 
-        .logo { font-weight: 800; font-size: 1.4rem; display: flex; align-items: center; gap: 10px; margin-bottom: 3rem; }
+        .logo { 
+            font-weight: 800; font-size: 1.4rem; 
+            display: flex; align-items: center; gap: 10px; 
+            margin-bottom: 3rem; letter-spacing: -0.5px;
+        }
         .logo span { color: var(--primary); }
 
         .nav-item {
             display: flex; align-items: center; gap: 12px;
-            padding: 12px 16px; border-radius: 12px;
+            padding: 14px 18px; border-radius: 16px;
             color: var(--text-dim); text-decoration: none;
-            margin-bottom: 8px; cursor: pointer; transition: all 0.2s;
-            font-weight: 500; font-size: 0.95rem;
+            margin-bottom: 8px; cursor: pointer; transition: all 0.3s;
+            font-weight: 600; font-size: 0.95rem;
         }
 
-        .nav-item:hover { background: rgba(255,255,255,0.04); color: white; }
-        .nav-item.active { background: var(--primary); color: white; }
+        .nav-item:hover { background: rgba(255,255,255,0.05); color: white; transform: translateX(5px); }
+        .nav-item.active { 
+            background: linear-gradient(135deg, var(--primary), var(--primary-light)); 
+            color: white; 
+            box-shadow: 0 10px 20px var(--primary-glow);
+        }
 
-        .content { flex: 1; overflow-y: auto; padding: 3rem 4rem; }
+        /* Mobile Header */
+        .mobile-top-bar {
+            display: none;
+            position: fixed; top: 0; left: 0; right: 0;
+            height: 70px; background: rgba(14, 14, 22, 0.8);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+            padding: 0 1.5rem; justify-content: space-between; align-items: center;
+            z-index: 1000;
+        }
 
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2.5rem; }
-        .header h2 { font-weight: 700; font-size: 1.75rem; }
+        .content { 
+            flex: 1; 
+            overflow-y: auto; 
+            padding: 3rem 4rem; 
+            scroll-behavior: smooth;
+        }
 
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; }
+        .header { margin-bottom: 3rem; }
+        .header h2 { font-weight: 800; font-size: 2.2rem; margin-bottom: 0.5rem; letter-spacing: -1px; }
 
-        .glass-card {
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            border-radius: 24px; padding: 2rem;
-            transition: transform 0.3s;
+        .grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); 
+            gap: 2rem; 
         }
 
         /* --- FORM ELEMENTS --- */
         .input-group { margin-bottom: 1.5rem; text-align: left; }
-        label { display: block; margin-bottom: 0.6rem; color: var(--text-dim); font-size: 0.85rem; font-weight: 600; }
+        label { display: block; margin-bottom: 0.8rem; color: var(--text-dim); font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
         input, select {
-            width: 100%; background: #0F0F16; border: 1px solid var(--border);
-            padding: 12px 16px; border-radius: 12px; color: white;
-            font-family: inherit; transition: border-color 0.3s;
+            width: 100%; background: rgba(15, 15, 22, 0.6); border: 1px solid var(--border);
+            padding: 14px 18px; border-radius: 14px; color: white;
+            font-family: inherit; transition: all 0.3s;
         }
-        input:focus { border-color: var(--primary); outline: none; }
+        input:focus, select:focus { border-color: var(--primary); outline: none; background: rgba(15, 15, 22, 0.9); box-shadow: 0 0 0 4px var(--primary-glow); }
 
         .btn {
-            background: var(--primary); color: white; border: none;
-            padding: 12px 24px; border-radius: 12px; font-weight: 600;
-            cursor: pointer; transition: all 0.3s; display: flex; align-items: center; gap: 8px; justify-content: center;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light)); 
+            color: white; border: none;
+            padding: 14px 28px; border-radius: 14px; font-weight: 700;
+            cursor: pointer; transition: all 0.3s; display: flex; align-items: center; gap: 10px; justify-content: center;
         }
-        .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 15px var(--primary-glow); }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn:hover { transform: translateY(-3px); box-shadow: 0 12px 25px var(--primary-glow); }
+        .btn:active { transform: translateY(-1px); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        .btn-outline {
+            background: transparent; border: 1px solid var(--border);
+            color: var(--text-main);
+        }
+        .btn-outline:hover { background: var(--border); border-color: var(--text-dim); }
 
         /* --- FILE LIST --- */
-        .file-list { margin-top: 2rem; }
         .file-item {
-            background: #1A1A26; padding: 12px 16px; border-radius: 14px;
-            display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
-            border: 1px solid rgba(255,255,255,0.03);
+            background: rgba(255, 255, 255, 0.03); 
+            padding: 16px 20px; border-radius: 18px;
+            display: flex; justify-content: space-between; align-items: center; 
+            margin-bottom: 12px;
+            border: 1px solid rgba(255,255,255,0.05);
+            transition: all 0.2s;
         }
-        .file-name { font-size: 0.9rem; font-weight: 500; display: flex; align-items: center; gap: 8px; }
-        .delete-btn { color: #555; cursor: pointer; transition: color 0.2s; }
-        .delete-btn:hover { color: var(--error); }
+        .file-item:hover { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 140, 0, 0.2); }
+        .file-name { font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+        .delete-btn { 
+            width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+            border-radius: 12px; color: #555; cursor: pointer; transition: all 0.2s; 
+        }
+        .delete-btn:hover { color: var(--error); background: rgba(239, 68, 68, 0.1); }
+
+        /* --- RESPONSIVENESS --- */
+        @media (max-width: 1024px) {
+            .content { padding: 2rem; }
+            .grid { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 768px) {
+            body { overflow-y: auto; }
+            .sidebar {
+                position: fixed; left: -280px; top: 0; bottom: 0;
+                box-shadow: 20px 0 50px rgba(0,0,0,0.5);
+            }
+            .sidebar.active { left: 0; }
+            .mobile-top-bar { display: flex; }
+            .content { padding: 100px 1.5rem 3rem; }
+            .header h2 { font-size: 1.8rem; }
+            #mainDashboard { flex-direction: column; }
+            
+            .sidebar-overlay {
+                display: none; position: fixed; inset: 0; 
+                background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+                z-index: 1000;
+            }
+            .sidebar-overlay.active { display: block; }
+        }
 
         .tag { font-size: 10px; background: rgba(255, 140, 0, 0.1); color: var(--primary); padding: 2px 8px; border-radius: 4px; font-weight: 700; }
 
@@ -133,40 +201,51 @@
 
     <!-- AUTH SECTION -->
     <div id="loginScreen">
-        <div class="login-card">
-            <div class="logo" style="justify-content: center; font-size: 2rem;">ACADEMIC<span>CORE</span></div>
-            <h1>Welcome back</h1>
-            <p>Enter your credentials to manage the academic core</p>
+        <div class="glass-card login-card" style="max-width: 440px; text-align: center;">
+            <div class="logo" style="justify-content: center; font-size: 2.5rem; margin-bottom: 1rem;">ACADEMIC<span>CORE</span></div>
+            <h1 style="font-size: 1.8rem; margin-bottom: 0.5rem;">Admin Access</h1>
+            <p style="color: var(--text-dim); margin-bottom: 2.5rem;">Authenticate to manage knowledge bases</p>
             <div class="input-group">
-                <label>Admin Username</label>
+                <label>Username</label>
                 <input type="text" id="username" placeholder="admin">
             </div>
             <div class="input-group">
-                <label>Access Password</label>
+                <label>Password</label>
                 <input type="password" id="password" placeholder="••••••••">
             </div>
-            <button class="btn" style="width: 100%" onclick="login()">
-                <i data-lucide="log-in" style="width: 18px"></i> Authenticate
+            <button class="btn" style="width: 100%; margin-top: 1rem;" onclick="login()">
+                <i data-lucide="shield-check" style="width: 20px"></i> Authenticate
             </button>
         </div>
     </div>
 
+    <!-- MOBILE OVERLAY -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+    <!-- MOBILE TOP BAR -->
+    <div class="mobile-top-bar">
+        <div class="logo" style="margin-bottom: 0">ACADEMIC<span>CORE</span></div>
+        <button class="btn-outline" style="padding: 10px; border-radius: 12px;" onclick="toggleSidebar()">
+            <i data-lucide="menu"></i>
+        </button>
+    </div>
+
     <!-- MAIN DASHBOARD -->
     <div id="mainDashboard">
-        <div class="sidebar">
+        <div class="sidebar" id="sidebar">
             <div class="logo">ACADEMIC<span>CORE</span></div>
             <div class="nav-item active" onclick="showTab('subjects', this)">
-                <i data-lucide="layout-grid"></i> Subjects
+                <i data-lucide="layout-grid"></i> <span>Subjects</span>
             </div>
             <div class="nav-item" onclick="showTab('files', this)">
-                <i data-lucide="folder-open"></i> File Manager
+                <i data-lucide="folder-open"></i> <span>File Manager</span>
             </div>
             <div class="nav-item" onclick="showTab('calendar', this)">
-                <i data-lucide="calendar"></i> Academic Calendar
+                <i data-lucide="calendar"></i> <span>Academic Calendar</span>
             </div>
             <div style="flex: 1"></div>
             <div class="nav-item" style="color: var(--error)" onclick="logout()">
-                <i data-lucide="log-out"></i> Sign Out
+                <i data-lucide="log-out"></i> <span>Sign Out</span>
             </div>
         </div>
 
@@ -175,16 +254,18 @@
             <div id="tab-subjects" class="tab-content">
                 <div class="header">
                     <h2>Manage Subjects</h2>
-                    <p style="color: var(--text-dim)">Add or remove teaching modules</p>
+                    <p style="color: var(--text-dim)">Create and organize academic modules</p>
                 </div>
                 <div class="grid">
                     <div class="glass-card">
-                        <label>New Subject Name</label>
-                        <div style="display: flex; gap: 10px">
-                            <input type="text" id="newSubject" placeholder="e.g. Physics (PHY)">
-                            <button class="btn" onclick="addSubject()">Add</button>
+                        <label>New Module Name</label>
+                        <div style="display: flex; gap: 12px">
+                            <input type="text" id="newSubject" placeholder="e.g. Artificial Intelligence (AI)">
+                            <button class="btn" onclick="addSubject()">
+                                <i data-lucide="plus"></i> <span class="hide-mobile">Add</span>
+                            </button>
                         </div>
-                        <div id="subjectList" style="margin-top: 2rem">
+                        <div id="subjectList" style="margin-top: 2.5rem">
                             <!-- Dynamically loaded -->
                         </div>
                     </div>
@@ -195,19 +276,38 @@
             <div id="tab-files" class="tab-content" style="display: none">
                 <div class="header">
                     <h2>File Manager</h2>
-                    <p style="color: var(--text-dim)">Review and manage study materials</p>
+                    <p style="color: var(--text-dim)">Upload lecture notes and study materials</p>
                 </div>
-                <div class="glass-card">
-                    <div class="input-group">
-                        <label>Select Subject to Manage</label>
-                        <select id="fileManagerSubject" onchange="loadFileDetails()">
-                            <option value="">-- Select --</option>
-                        </select>
+                
+                <div class="grid">
+                    <!-- UPLOAD SECTION -->
+                    <div class="glass-card" style="border-color: var(--border);">
+                        <h3 style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 10px;">
+                            <i data-lucide="upload-cloud" style="color: var(--primary)"></i> Upload Knowledge
+                        </h3>
+                        <div class="input-group">
+                            <label>Target Subject</label>
+                            <select id="fileManagerSubject" onchange="loadFileDetails()">
+                                <option value="">-- Select Subject --</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label>PDF Document</label>
+                            <input type="file" id="subjectFileInput" accept="application/pdf">
+                        </div>
+                        <button class="btn" id="uploadBtn" onclick="uploadFile()" style="width: 100%">
+                            <i data-lucide="file-up"></i> Process & Store PDF
+                        </button>
                     </div>
-                    <div id="docList" class="file-list">
-                        <!-- Loaded documents -->
-                        <div style="text-align: center; color: var(--text-dim); padding: 2rem;">
-                            Select a subject to see files
+
+                    <!-- FILE LIST SECTION -->
+                    <div class="glass-card">
+                        <h3 style="margin-bottom: 1.5rem;">Module Documents</h3>
+                        <div id="docList" class="file-list">
+                            <div style="text-align: center; color: var(--text-dim); padding: 3rem;">
+                                <i data-lucide="file-search" style="width: 48px; height: 48px; margin-bottom: 1rem; opacity: 0.3;"></i>
+                                <p>Select a subject to view files</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -217,22 +317,24 @@
             <div id="tab-calendar" class="tab-content" style="display: none">
                 <div class="header">
                     <h2>Academic Calendar</h2>
-                    <p style="color: var(--text-dim)">Manage global schedule documents</p>
+                    <p style="color: var(--text-dim)">Upload global schedules for AI reach</p>
                 </div>
                 <div class="grid">
                     <div class="glass-card">
-                        <h3>📅 Global Schedule</h3>
-                        <p style="font-size: 0.85rem; color: var(--text-dim); margin: 0.5rem 0 1.5rem">
-                            Documents uploaded here are reachable by the AI regardless of the student's selected subject.
+                        <h3 style="margin-bottom: 1rem; display: flex; align-items: center; gap: 10px;">
+                            <i data-lucide="calendar-check" style="color: var(--primary)"></i> Global Schedule
+                        </h3>
+                        <p style="font-size: 0.9rem; color: var(--text-dim); margin-bottom: 2rem; line-height: 1.6;">
+                            Files uploaded here will be used by the AI to answer scheduling questions regardless of the current subject.
                         </p>
                         <div class="input-group">
-                            <label>Calendar PDF / Schedule</label>
+                            <label>Schedule File (PDF)</label>
                             <input type="file" id="calendarInput" accept="application/pdf">
                         </div>
-                        <button class="btn" id="calendarBtn" onclick="uploadCalendar()">
-                            <i data-lucide="upload-cloud"></i> Upload Global Calendar
+                        <button class="btn" id="calendarBtn" onclick="uploadCalendar()" style="width: 100%">
+                            <i data-lucide="calendar-plus"></i> Sync Global Calendar
                         </button>
-                        <div id="calendarFiles" class="file-list"></div>
+                        <div id="calendarFiles" class="file-list" style="margin-top: 2.5rem"></div>
                     </div>
                 </div>
             </div>
@@ -255,10 +357,17 @@
             } catch (e) {}
         };
 
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('active');
+            document.getElementById('sidebarOverlay').classList.toggle('active');
+        }
+
         function showMain() {
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('mainDashboard').style.display = 'flex';
-            document.getElementById('mainDashboard').style.opacity = '1';
+            setTimeout(() => {
+                document.getElementById('mainDashboard').style.opacity = '1';
+            }, 10);
             loadData();
         }
 
@@ -272,10 +381,10 @@
             });
 
             if (res.ok) {
-                showToast('Authentication Successful');
+                showToast('🚀 Authentication Successful');
                 showMain();
             } else {
-                showToast('Invalid Access Code', true);
+                showToast('❌ Invalid Access Credentials', true);
             }
         }
 
@@ -289,6 +398,11 @@
             document.getElementById('tab-' + tabId).style.display = 'block';
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             el.classList.add('active');
+            
+            // Close sidebar on mobile after selection
+            if (window.innerWidth <= 768) {
+                toggleSidebar();
+            }
         }
 
         async function loadData() {
@@ -301,43 +415,94 @@
             
             // File Manager Dropdown
             const select = document.getElementById('fileManagerSubject');
+            const currentVal = select.value;
             select.innerHTML = '<option value="">-- Select Subject --</option>';
 
             data.subjects.forEach(s => {
                 subList.innerHTML += `
                     <div class="file-item">
-                        <span class="file-name"><i data-lucide="hash" style="width: 14px"></i> ${s}</span>
-                        <i data-lucide="trash-2" class="delete-btn" style="width: 18px" onclick="deleteSubject('${s}')"></i>
+                        <span class="file-name"><i data-lucide="layers" style="width: 14px; color: var(--primary)"></i> ${s}</span>
+                        <i data-lucide="trash-2" class="delete-btn" onclick="deleteSubject('${s}')"></i>
                     </div>
                 `;
                 select.innerHTML += `<option value="${s}">${s}</option>`;
             });
+            if (currentVal) select.value = currentVal;
             lucide.createIcons();
             
-            // Load Calendar Files
             loadCalendarDetails();
         }
 
         async function loadFileDetails() {
             const subject = document.getElementById('fileManagerSubject').value;
-            if (!subject) return;
+            const docList = document.getElementById('docList');
+            
+            if (!subject) {
+                docList.innerHTML = `
+                    <div style="text-align: center; color: var(--text-dim); padding: 3rem;">
+                        <i data-lucide="file-search" style="width: 48px; height: 48px; margin-bottom: 1rem; opacity: 0.3;"></i>
+                        <p>Select a subject to view files</p>
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
 
             const res = await fetch('/api/files');
             const data = await res.json();
             const docs = data.subjects[subject] || [];
 
-            const docList = document.getElementById('docList');
-            docList.innerHTML = docs.length ? '' : '<div style="text-align: center; color: var(--text-dim); padding: 2rem;">No PDFs uploaded yet</div>';
+            docList.innerHTML = docs.length ? '' : `
+                <div style="text-align: center; color: var(--text-dim); padding: 3rem;">
+                    <i data-lucide="inbox" style="width: 40px; opacity: 0.3; margin-bottom: 1rem;"></i>
+                    <p>No PDFs uploaded for this module</p>
+                </div>
+            `;
 
             docs.forEach(d => {
                 docList.innerHTML += `
                     <div class="file-item">
-                        <span class="file-name"><i data-lucide="file-text" style="width:14px"></i> ${d.fileName}</span>
-                        <i data-lucide="trash-2" class="delete-btn" style="width:18px" onclick="deleteFile('${subject}', '${d.id}')"></i>
+                        <span class="file-name"><i data-lucide="file-text" style="width:14px; opacity: 0.6"></i> ${d.fileName}</span>
+                        <i data-lucide="trash-2" class="delete-btn" onclick="deleteFile('${subject}', '${d.id}')"></i>
                     </div>
                 `;
             });
             lucide.createIcons();
+        }
+
+        async function uploadFile() {
+            const subject = document.getElementById('fileManagerSubject').value;
+            const fileInput = document.getElementById('subjectFileInput');
+            const file = fileInput.files[0];
+
+            if (!subject) return showToast('⚠️ Select a subject first', true);
+            if (!file) return showToast('⚠️ Select a PDF to upload', true);
+
+            const btn = document.getElementById('uploadBtn');
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Processing...';
+
+            const formData = new FormData();
+            formData.append('pdfFile', file);
+            formData.append('subject', subject);
+
+            try {
+                const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (res.ok) {
+                    showToast('✅ ' + (data.message || 'File Uploaded'));
+                    fileInput.value = '';
+                    loadFileDetails();
+                } else {
+                    showToast('❌ ' + (data.error || 'Upload failed'), true);
+                }
+            } catch (e) {
+                showToast('❌ Network error during upload', true);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
         }
 
         async function loadCalendarDetails() {
@@ -349,8 +514,8 @@
             docs.forEach(d => {
                 list.innerHTML += `
                     <div class="file-item">
-                        <span class="file-name"><i data-lucide="calendar-days" style="width:14px"></i> ${d.fileName}</span>
-                        <i data-lucide="trash-2" class="delete-btn" style="width:18px" onclick="deleteFile('__CALENDAR__', '${d.id}')"></i>
+                        <span class="file-name"><i data-lucide="calendar" style="width:14px; color: var(--primary)"></i> ${d.fileName}</span>
+                        <i data-lucide="trash-2" class="delete-btn" onclick="deleteFile('__CALENDAR__', '${d.id}')"></i>
                     </div>
                 `;
             });
@@ -366,35 +531,36 @@
                 body: JSON.stringify({ name })
             });
             if (res.ok) {
-                showToast('Subject Added');
+                showToast('✨ Module Created');
                 document.getElementById('newSubject').value = '';
                 loadData();
             }
         }
 
         async function deleteSubject(name) {
-            if (!confirm(`Delete subject "${name}" and ALL its data?`)) return;
+            if (!confirm(`Delete module "${name}" and ALL its intelligence?`)) return;
             await fetch(`/api/subjects/${encodeURIComponent(name)}`, { method: 'DELETE' });
             loadData();
         }
 
         async function deleteFile(subject, id) {
-            if (!confirm(`Permanently delete this knowledge file?`)) return;
+            if (!confirm(`Permanently remove this knowledge file?`)) return;
             const res = await fetch(`/api/files/${encodeURIComponent(subject)}/${id}`, { method: 'DELETE' });
             if (res.ok) {
-                showToast('File Removed');
-                loadFileDetails(); // for tab
-                loadCalendarDetails(); // for calendar
+                showToast('🗑️ Intelligence Removed');
+                loadFileDetails();
+                loadCalendarDetails();
             }
         }
 
         async function uploadCalendar() {
             const file = document.getElementById('calendarInput').files[0];
-            if (!file) return showToast('Select a PDF first', true);
+            if (!file) return showToast('⚠️ Select a schedule PDF', true);
 
             const btn = document.getElementById('calendarBtn');
+            const originalHtml = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = 'Processing...';
+            btn.innerHTML = 'Updating...';
 
             const formData = new FormData();
             formData.append('pdfFile', file);
@@ -403,12 +569,13 @@
             try {
                 const res = await fetch('/api/upload', { method: 'POST', body: formData });
                 if (res.ok) {
-                    showToast('Calendar Synced');
+                    showToast('📅 Schedule Synced');
                     loadCalendarDetails();
+                    document.getElementById('calendarInput').value = '';
                 }
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = 'Upload Global Calendar';
+                btn.innerHTML = originalHtml;
             }
         }
 
@@ -416,6 +583,7 @@
             const t = document.getElementById('toast');
             t.innerText = msg;
             t.style.borderColor = isError ? 'var(--error)' : 'var(--primary)';
+            t.style.background = isError ? 'rgba(239, 68, 68, 0.1)' : 'var(--card-bg)';
             t.classList.add('show');
             setTimeout(() => t.classList.remove('show'), 3000);
         }
