@@ -9,16 +9,12 @@ export class AiService {
    * Generates embeddings for an array of texts in batches
    */
   async getEmbeddings(texts, inputType = "passage") {
-    // NVIDIA recommended max batch size is 50 for embeddings
     const BATCH_SIZE = 50;
     let allEmbeddings = [];
-
-    // Ensure it's an array
     const textArray = Array.isArray(texts) ? texts : [texts];
 
     for (let i = 0; i < textArray.length; i += BATCH_SIZE) {
       const batch = textArray.slice(i, i + BATCH_SIZE);
-
       const response = await fetch(`${BASE_URL}/embeddings`, {
         method: "POST",
         headers: {
@@ -39,23 +35,16 @@ export class AiService {
       }
 
       const data = await response.json();
-      // Keep order of embeddings
       allEmbeddings.push(...data.data.map(d => d.embedding));
     }
 
     return Array.isArray(texts) ? allEmbeddings : allEmbeddings[0];
   }
 
-  /**
-   * Generates embedding for single text (Backwards compatibility)
-   */
   async getEmbedding(text, inputType = "passage") {
     return this.getEmbeddings(text, inputType);
   }
 
-  /**
-   * Expands the user query for better retrieval matching
-   */
   async expandQuery(question) {
     try {
       const response = await fetch(`${BASE_URL}/chat/completions`, {
@@ -69,12 +58,9 @@ export class AiService {
           messages: [
             {
               role: "system",
-              content: "You are a specialized RAG query expansion engine. REWRITE the user question into a detailed search query for a vector database. Include synonyms and keywords. OUTPUT ONLY THE SEARCH STRING. DO NOT EXPLAIN. DO NOT ASK QUESTIONS. If the user says 'hi' or something casual, just output the same word back."
+              content: "You are a specialized RAG query expansion engine. REWRITE the user question into a detailed search query for a vector database. Include synonyms and keywords. OUTPUT ONLY THE SEARCH STRING. DO NOT EXPLAIN. DO NOT ASK QUESTIONS."
             },
-            {
-              role: "user",
-              content: question
-            }
+            { role: "user", content: question }
           ],
           temperature: 0.1
         })
@@ -82,17 +68,13 @@ export class AiService {
 
       if (!response.ok) return question;
       const data = await response.json();
-      const expanded = data.choices[0].message.content.trim();
-      return expanded;
+      return data.choices[0].message.content.trim();
     } catch (e) {
       console.error("Query Expansion Error:", e.message);
       return question;
     }
   }
 
-  /**
-   * Triple-Path Intent Governor
-   */
   async getIntent(question) {
     try {
       const response = await fetch(`${BASE_URL}/chat/completions`, {
@@ -107,9 +89,9 @@ export class AiService {
             {
               role: "system",
               content: `Classify user intent into exactly one category:
-              - 'CASUAL': Greetings, jokes, identity, or meta-talk.
-              - 'STUDY_QUICK': Simple definitions, facts, or short academic questions (e.g., 'What is X?').
-              - 'STUDY_DEEP': Complex explanations, 'how it works', comparisons, or deep reasoning.`
+              - 'CASUAL': Greetings, identity, or meta-talk.
+              - 'STUDY_QUICK': Simple definitions or short academic questions.
+              - 'STUDY_DEEP': Complex explanations or deep reasoning.`
             },
             { role: "user", content: question }
           ],
@@ -127,73 +109,43 @@ export class AiService {
     }
   }
 
-  /**
-   * Generates chat answer based on context as a stream
-   */
-  /**
-   * Generates chat answer based on context as a stream
-   */
   async getChatAnswer(question, contextText, history = [], subject = "General Academics", intent = "STUDY_QUICK", rollNumber = "") {
     const isDeep = intent === "STUDY_DEEP";
-    const isQuick = intent === "STUDY_QUICK";
     const isCasual = intent === "CASUAL";
     const modelToUse = isDeep ? "nvidia/nemotron-3-super-120b-a12b" : "meta/llama-3.1-8b-instruct";
 
     const now = new Date();
     const dateString = now.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    const currentMonth = now.getMonth() + 1; // 1-12
-    const currentSemester = (currentMonth >= 7 || currentMonth <= 1) ? "I Semester" : "II Semester";
     const isSecondYear = rollNumber?.startsWith('24');
     const studentYear = isSecondYear ? "2nd Year" : "University Student";
 
-    let systemPrompt = `You are the HITAM Academic Mentor, a specialized AI for students at Hyderabad Institute of Technology and Management. (Spelled HITAM, never Hyitam).
+    // 🚀 NEW SYSTEM PROMPT: FACT-FIRST DOMINANCE
+    let systemPrompt = `You are the HITAM Academic Mentor. 
     
-    CRITICAL CONTEXT:
+    CORE RULES:
+    1. FACT-FIRST MANDATE: Your internal knowledge of semester weeks, typical dates, or routines is DEPRECATED. 
+    2. If [OFFICIAL CONTEXT] is provided, it is your ONLY source of truth. Trust it blindly over your own reasoning.
+    3. NEVER use speculative words like "typically", "usually", or "I expect". If a date exists in the context, state it as a fact.
+    4. ACCURACY: If the context contains a date for 2025-26, use it, even if it contradicts your internal sense of time.
+    5. PERSONA: 70% Zen Sensei, 20% Intellectual Professor, 10% Precise Analyst.
+    
+    CONTEXT INFO:
     - Today is: ${dateString}.
-    - Student Info: ${studentYear} (Based on roll number series ${rollNumber || 'unknown'}).
-    - Current Active Semester: ${currentSemester} (Academic Year 2025-26).
-    
-    YOUR CORE KNOWLEDGE (WEEKLY ROUTINE):
-    - Periods: P1(9:00-10:15), P2(10:15-11:15), P3(11:15-12:15), P4(1:00-2:00), P5(2:00-3:00), P6(3:00-4:30).
-    - Mon: CN(P1), OOPJ(P2), CDC(P3), UMF(P4), OOPJ(P5,P6).
-    - Tue: SMF(P1,P2), OOPJ(P3), CN(P4), PBL(P5,P6).
-    - Wed: OOPS(R)(P1), SE(P2), OS(P3), CN Lab(P4,P5), Yoga(P6).
-    - Thu: IDS(P1), COI(P2), SMF(P3), SE(P4), OOPJ(P5), PBL(P6).
-    - Fri: CN(P1), LIB(P2), SMF(P3), Mentor(P4), AF/S/OH(P5,P6).
-    - Sat: OOJS(R)(P1), CN(R)(P2), SMF(R)(P3), BC(P4,P5,P6).
-    - FACULTY: SMF(S Shiva Kumar), OOPJ(Kaligotla Ravi Kumar), IDS(Richa Tiwari), CN(Chindala Tarun Kumar), SE(Nishani Shivakumar), COI(Dr. D. Ashalatha), OS/CDC/PBL/Mentor/LIB(Richa Tiwari).
-
-    YOUR SOUL: 70% Zen Sensei, 20% Intellectual Professor, 10% Precise Analyst.
-    STRICT RULE: Only support students in their academics. Avoid casual 'vibing'.
-    OFF-TOPIC RULE: If a student goes off-topic, do NOT use the word "pivot". Instead, as a wise mentor, Acknowledge briefly and lead them back with senior-level academic wisdom.
-    
-    STRICT FORMATTING RULE: 
-    - START your message directly with the first word of your advice. 
-    - NEVER use quotes ("" or '') or decorative triple backticks (\`\`\`) to wrap your entire message.
-    
-    WISDOM & ACCURACY RULE: 
-    - You are a proactive Mentor. If you see fragmented data (like "exams | 18.05.2026"), use your intelligence to bridge the gaps. 
-    - If a scheduling question is asked, look at the GLOBAL ACADEMIC CALENDAR sources in context. 
-    - NEVER say "I don't have the schedule" if there is even a fragment of a calendar in the context. Instead, say: "Based on the official calendar I've found, here is what I can see..."
-    - Prioritize student guidance over rigid data-matching. 
-    - For Academic Year 2025-26, the uploaded files are your ultimate source of truth.`;
-
-    if (isCasual) {
-      systemPrompt += `\nVIBE: Wise and patient. Encourage the student to find focus in their studies.`;
-    } else if (isQuick) {
-      systemPrompt += `\nFOCUS: Short, extremely accurate schedule details or academic definitions.`;
-    } else if (isDeep) {
-      systemPrompt += `\nFOCUS: Structural deep dives. Explain "Why" and "How" clearly.`;
-    }
+    - Student: ${studentYear} (Roll: ${rollNumber || 'unknown'}).`;
 
     const chatMessages = [
       { role: "system", content: systemPrompt },
       ...history,
-      {
-        role: "user",
-        content: isCasual ? question : `Context:\n${contextText}\n\nStudent Question: ${question}`
-      }
+      { role: "user", content: question }
     ];
+
+    // 🔥 CONTEXT OVERRIDE: Inject as a final high-priority system command
+    if (contextText && !isCasual) {
+      chatMessages.push({
+        role: "system",
+        content: `FINAL INSTRUCTION: Use this [OFFICIAL CONTEXT] to answer. It contains absolute dates from the latest Academic Calendar. Ignore your internal clock for 'weeks of the semester' and prioritize these dates.\n\n${contextText}`
+      });
+    }
 
     const requestBody = {
       model: modelToUse,
@@ -220,17 +172,13 @@ export class AiService {
       body: JSON.stringify(requestBody)
     });
 
-
     if (!response.ok) {
       throw new Error(`Chat API Error: ${await response.text()}`);
     }
 
-    return response.body; // Returns the readable stream
+    return response.body;
   }
 
-  /**
-   * AI Vision Engine: Extracts text and tables from images using Multimodal LLMs
-   */
   async performVisionOcr(base64Image, mimeType = "image/png") {
     try {
       console.log(`👁️ Calling AI Vision Engine (${mimeType}) for transcription...`);
@@ -248,13 +196,11 @@ export class AiService {
               content: [
                 { 
                   type: "text", 
-                  text: "You are an OCR expert. Precisely transcribe every detail from this academic document. If you see a timetable, schedule, or list, format it as a clean Markdown table to preserve the original structure. Ignore background noise. Be 100% accurate with dates, times, and subject names." 
+                  text: "You are an OCR expert. Precisely transcribe every detail from this academic document. If you see a timetable, schedule, or list, format it as a clean Markdown table. Ignore background noise." 
                 },
                 {
                   type: "image_url",
-                  image_url: {
-                    url: `data:${mimeType};base64,${base64Image}`
-                  }
+                  image_url: { url: `data:${mimeType};base64,${base64Image}` }
                 }
               ]
             }
@@ -265,15 +211,12 @@ export class AiService {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`⚠️ Vision API Error (${response.status}): ${errorText}`);
-        return null; // Return null to trigger local Tesseract fallback
+        console.error(`⚠️ Vision API Error (${response.status})`);
+        return null;
       }
 
       const data = await response.json();
-      const transcription = data.choices[0]?.message?.content || "";
-      console.log("✅ AI Vision transcription complete.");
-      return transcription;
+      return data.choices[0]?.message?.content || "";
     } catch (e) {
       console.error("Vision OCR Error:", e.message);
       return null;
