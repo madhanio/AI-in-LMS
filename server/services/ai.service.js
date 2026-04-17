@@ -26,7 +26,7 @@ export class AiService {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: "nvidia/llama-3.2-nv-embedqa-1b-v2",
+          model: "nvidia/nv-embedqa-e5-v5",
           input: batch,
           input_type: inputType,
           encoding_format: "float",

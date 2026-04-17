@@ -48,6 +48,24 @@
             box-shadow: 0 20px 40px rgba(0,0,0,0.4);
         }
 
+        /* --- LOGIN SCREEN --- */
+        #loginScreen {
+            position: fixed; inset: 0;
+            background: radial-gradient(circle at top right, #1a1510, #0a0a0f);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000; padding: 20px;
+        }
+
+        .login-card {
+            width: 100%; max-width: 440px;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
         /* --- DASHBOARD LAYOUT --- */
         #mainDashboard { 
             display: none; 
@@ -104,19 +122,23 @@
             overflow-y: auto; 
             padding: 3rem 4rem; 
             scroll-behavior: smooth;
+            display: flex; flex-direction: column; align-items: center; /* Center content horizontally */
         }
 
-        .header { margin-bottom: 3rem; }
+        .tab-content { width: 100%; max-width: 1200px; } /* Max width for large screens */
+
+        .header { margin-bottom: 3rem; text-align: left; width: 100%; }
         .header h2 { font-weight: 800; font-size: 2.2rem; margin-bottom: 0.5rem; letter-spacing: -1px; }
 
         .grid { 
             display: grid; 
-            grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); 
+            grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); 
             gap: 2rem; 
+            width: 100%;
         }
 
         /* --- FORM ELEMENTS --- */
-        .input-group { margin-bottom: 1.5rem; text-align: left; }
+        .input-group { margin-bottom: 1.5rem; text-align: left; position: relative; }
         label { display: block; margin-bottom: 0.8rem; color: var(--text-dim); font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
         input, select {
             width: 100%; background: rgba(15, 15, 22, 0.6); border: 1px solid var(--border);
@@ -125,11 +147,19 @@
         }
         input:focus, select:focus { border-color: var(--primary); outline: none; background: rgba(15, 15, 22, 0.9); box-shadow: 0 0 0 4px var(--primary-glow); }
 
+        .password-toggle {
+            position: absolute; right: 18px; bottom: 14px;
+            color: var(--text-dim); cursor: pointer; transition: color 0.2s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .password-toggle:hover { color: var(--primary); }
+
         .btn {
             background: linear-gradient(135deg, var(--primary), var(--primary-light)); 
             color: white; border: none;
             padding: 14px 28px; border-radius: 14px; font-weight: 700;
             cursor: pointer; transition: all 0.3s; display: flex; align-items: center; gap: 10px; justify-content: center;
+            width: 100%; /* Default to full width for small forms */
         }
         .btn:hover { transform: translateY(-3px); box-shadow: 0 12px 25px var(--primary-glow); }
         .btn:active { transform: translateY(-1px); }
@@ -201,7 +231,7 @@
 
     <!-- AUTH SECTION -->
     <div id="loginScreen">
-        <div class="glass-card login-card" style="max-width: 440px; text-align: center;">
+        <div class="glass-card login-card">
             <div class="logo" style="justify-content: center; font-size: 2.5rem; margin-bottom: 1rem;">ACADEMIC<span>CORE</span></div>
             <h1 style="font-size: 1.8rem; margin-bottom: 0.5rem;">Admin Access</h1>
             <p style="color: var(--text-dim); margin-bottom: 2.5rem;">Authenticate to manage knowledge bases</p>
@@ -212,8 +242,9 @@
             <div class="input-group">
                 <label>Password</label>
                 <input type="password" id="password" placeholder="••••••••">
+                <i data-lucide="eye" class="password-toggle" id="eyeIcon" onclick="togglePassword()"></i>
             </div>
-            <button class="btn" style="width: 100%; margin-top: 1rem;" onclick="login()">
+            <button class="btn" style="margin-top: 1rem;" onclick="login()">
                 <i data-lucide="shield-check" style="width: 20px"></i> Authenticate
             </button>
         </div>
@@ -359,7 +390,21 @@
 
         function toggleSidebar() {
             document.getElementById('sidebar').classList.toggle('active');
-            document.getElementById('sidebarOverlay').classList.toggle('active');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (overlay) overlay.classList.toggle('active');
+        }
+
+        function togglePassword() {
+            const passInput = document.getElementById('password');
+            const eyeIcon = document.getElementById('eyeIcon');
+            if (passInput.type === 'password') {
+                passInput.type = 'text';
+                eyeIcon.setAttribute('data-lucide', 'eye-off');
+            } else {
+                passInput.type = 'password';
+                eyeIcon.setAttribute('data-lucide', 'eye');
+            }
+            lucide.createIcons();
         }
 
         function showMain() {
@@ -374,17 +419,105 @@
         async function login() {
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
-            const res = await fetch('/api/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-            });
+            const btn = document.querySelector('#loginScreen .btn');
+            const originalHtml = btn.innerHTML;
 
-            if (res.ok) {
-                showToast('🚀 Authentication Successful');
-                showMain();
-            } else {
-                showToast('❌ Invalid Access Credentials', true);
+            btn.disabled = true;
+            btn.innerHTML = 'Verifying...';
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (res.ok) {
+                    showToast('🚀 Authentication Successful');
+                    showMain();
+                } else {
+                    showToast('❌ Invalid Access Credentials', true);
+                }
+            } catch (e) {
+                showToast('❌ Connection Error', true);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        }
+
+        async function uploadFile() {
+            const subject = document.getElementById('fileManagerSubject').value;
+            const fileInput = document.getElementById('subjectFileInput');
+            const file = fileInput.files[0];
+
+            if (!subject) return showToast('⚠️ Select a subject first', true);
+            if (!file) return showToast('⚠️ Select a PDF to upload', true);
+
+            const btn = document.getElementById('uploadBtn');
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '⚙️ Processing Intelligence...';
+
+            const formData = new FormData();
+            formData.append('pdfFile', file);
+            formData.append('subject', subject);
+
+            try {
+                const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (res.ok) {
+                    showToast('✅ ' + (data.message || 'File Uploaded'));
+                    fileInput.value = '';
+                    loadFileDetails();
+                } else {
+                    // Check for common dimension errors and make them friendly
+                    let errorMsg = data.error || 'Upload failed';
+                    if (errorMsg.includes('dimensions')) {
+                        errorMsg = '🛠️ Configuration Mismatch: Database expected different dimensions. Contact Developer.';
+                    }
+                    showToast('❌ ' + errorMsg, true);
+                }
+            } catch (e) {
+                showToast('❌ Network error during upload', true);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        }
+
+        async function uploadCalendar() {
+            const file = document.getElementById('calendarInput').files[0];
+            if (!file) return showToast('⚠️ Select a schedule PDF', true);
+
+            const btn = document.getElementById('calendarBtn');
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '⚙️ Syncing Schedule...';
+
+            const formData = new FormData();
+            formData.append('pdfFile', file);
+            formData.append('subject', '__CALENDAR__');
+
+            try {
+                const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (res.ok) {
+                    showToast('📅 Schedule Synced Successfully');
+                    loadCalendarDetails();
+                    document.getElementById('calendarInput').value = '';
+                } else {
+                    let errorMsg = data.error || 'Upload failed';
+                    if (errorMsg.includes('dimensions')) {
+                        errorMsg = '🛠️ Calendar Sync Error: Vector dimension mismatch.';
+                    }
+                    showToast('❌ ' + errorMsg, true);
+                }
+            } catch (e) {
+                showToast('❌ Network error during sync', true);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
             }
         }
 
@@ -409,11 +542,9 @@
             const res = await fetch('/api/subjects');
             const data = await res.json();
             
-            // Subjects View
             const subList = document.getElementById('subjectList');
             subList.innerHTML = '';
             
-            // File Manager Dropdown
             const select = document.getElementById('fileManagerSubject');
             const currentVal = select.value;
             select.innerHTML = '<option value="">-- Select Subject --</option>';
@@ -470,41 +601,6 @@
             lucide.createIcons();
         }
 
-        async function uploadFile() {
-            const subject = document.getElementById('fileManagerSubject').value;
-            const fileInput = document.getElementById('subjectFileInput');
-            const file = fileInput.files[0];
-
-            if (!subject) return showToast('⚠️ Select a subject first', true);
-            if (!file) return showToast('⚠️ Select a PDF to upload', true);
-
-            const btn = document.getElementById('uploadBtn');
-            const originalHtml = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner"></span> Processing...';
-
-            const formData = new FormData();
-            formData.append('pdfFile', file);
-            formData.append('subject', subject);
-
-            try {
-                const res = await fetch('/api/upload', { method: 'POST', body: formData });
-                const data = await res.json();
-                if (res.ok) {
-                    showToast('✅ ' + (data.message || 'File Uploaded'));
-                    fileInput.value = '';
-                    loadFileDetails();
-                } else {
-                    showToast('❌ ' + (data.error || 'Upload failed'), true);
-                }
-            } catch (e) {
-                showToast('❌ Network error during upload', true);
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = originalHtml;
-            }
-        }
-
         async function loadCalendarDetails() {
             const res = await fetch('/api/files');
             const data = await res.json();
@@ -530,10 +626,13 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name })
             });
+            const data = await res.json();
             if (res.ok) {
                 showToast('✨ Module Created');
                 document.getElementById('newSubject').value = '';
                 loadData();
+            } else {
+                showToast('❌ ' + data.error, true);
             }
         }
 
@@ -550,32 +649,6 @@
                 showToast('🗑️ Intelligence Removed');
                 loadFileDetails();
                 loadCalendarDetails();
-            }
-        }
-
-        async function uploadCalendar() {
-            const file = document.getElementById('calendarInput').files[0];
-            if (!file) return showToast('⚠️ Select a schedule PDF', true);
-
-            const btn = document.getElementById('calendarBtn');
-            const originalHtml = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = 'Updating...';
-
-            const formData = new FormData();
-            formData.append('pdfFile', file);
-            formData.append('subject', '__CALENDAR__');
-
-            try {
-                const res = await fetch('/api/upload', { method: 'POST', body: formData });
-                if (res.ok) {
-                    showToast('📅 Schedule Synced');
-                    loadCalendarDetails();
-                    document.getElementById('calendarInput').value = '';
-                }
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = originalHtml;
             }
         }
 
