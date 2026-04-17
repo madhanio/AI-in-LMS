@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "dev": "node --watch index.js"
+    "dev": "node --watch index.js",
+    "postinstall": "pip install -r requirements.txt"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.0",
