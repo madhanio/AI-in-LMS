@@ -226,9 +226,6 @@ export class AiService {
     }
   }
 
-  }
-
-
   /**
    * Multimodal structured extraction using Gemma 3 Vision via NVIDIA NIM
    */
