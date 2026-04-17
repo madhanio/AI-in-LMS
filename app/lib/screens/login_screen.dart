@@ -11,16 +11,16 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _studentIdCtrl = TextEditingController();
+  final _rollNoCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _isLoading = false;
   String? _errorMessage;
 
   Future<void> _handleLogin() async {
-    final studentId = _studentIdCtrl.text.trim();
+    final rollNo = _rollNoCtrl.text.trim();
     final password = _passwordCtrl.text;
 
-    if (studentId.isEmpty || password.isEmpty) {
+    if (rollNo.isEmpty || password.isEmpty) {
       setState(() => _errorMessage = 'Please fill in all fields.');
       return;
     }
@@ -32,7 +32,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       await SupabaseService.signIn(
-        studentId: studentId,
+        rollNo: rollNo,
         password: password,
       );
       
@@ -44,7 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } catch (e) {
       if (mounted) {
-        setState(() => _errorMessage = 'Invalid Student ID or password.');
+        setState(() => _errorMessage = 'Invalid Roll Number or password.');
       }
     } finally {
       if (mounted) {
@@ -92,10 +92,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 TextField(
-                  controller: _studentIdCtrl,
+                  controller: _rollNoCtrl,
                   decoration: InputDecoration(
-                    labelText: 'Student ID',
-                    prefixIcon: const Icon(Icons.person),
+                    labelText: 'Roll Number',
+                    prefixIcon: const Icon(Icons.numbers),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),

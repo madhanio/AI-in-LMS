@@ -11,8 +11,8 @@ class SupabaseService {
     required String name,
     required String department,
   }) async {
-    // Generate an email internally for Supabase Auth since we login with Student ID
-    final email = '$studentId@student.hitam.edu';
+    // Generate an email internally for Supabase Auth since we login with Roll Number
+    final email = '$rollNo@hitam.org';
     final response = await client.auth.signUp(
       email: email,
       password: password,
@@ -32,12 +32,12 @@ class SupabaseService {
     return response;
   }
 
-  // Log in using student ID
+  // Log in using roll number
   static Future<AuthResponse> signIn({
-    required String studentId,
+    required String rollNo,
     required String password,
   }) async {
-    final email = '$studentId@student.hitam.edu';
+    final email = '$rollNo@hitam.org';
     return await client.auth.signInWithPassword(
       email: email,
       password: password,
