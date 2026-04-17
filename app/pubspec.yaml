@@ -70,6 +70,7 @@ flutter:
   assets:
     - assets/moodle.png
     - assets/moodle_padded_splash.png
+    - assets/moodle_full.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

@@ -66,7 +66,7 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(Icons.school, size: 80, color: Color(0xFFF98012)),
+                Image.asset('assets/moodle_full.png', height: 80),
                 const SizedBox(height: 24),
                 const Text(
                   'Student Login',
