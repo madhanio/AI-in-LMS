@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
-    "postinstall": "pip install -r requirements.txt"
+    "postinstall": "pip install --only-binary=:all: -r requirements.txt"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.0",
