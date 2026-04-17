@@ -103,7 +103,7 @@ router.post('/upload', authenticateAdmin, upload.single('pdfFile'), async (req, 
 router.post('/query', async (req, res) => {
   const startTime = Date.now();
   let finalContext = "No specific lecture notes found for this query.";
-  const { question, subject, history = [] } = req.body;
+  const { question, subject, history = [], rollNumber = "" } = req.body;
 
   try {
     if (!question) {
@@ -157,7 +157,7 @@ router.post('/query', async (req, res) => {
       console.log("Casual/Meta query detected. Skipping PDF search.");
     }
 
-    const stream = await aiService.getChatAnswer(question, finalContext, history, subject, intent);
+    const stream = await aiService.getChatAnswer(question, finalContext, history, subject || 'General', intent, rollNumber);
     
     // Set headers for streaming (Critical for Render/Proxy stability)
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');

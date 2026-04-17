@@ -106,7 +106,7 @@ flutter:
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "assets/moodle.png"
+  image_path: "assets/moodle_high_res.png"
 
 flutter_native_splash:
   color: "#ffffff"

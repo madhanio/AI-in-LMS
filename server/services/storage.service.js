@@ -26,7 +26,7 @@ export class StorageService {
       return [];
     }
     // Filter out internal system subjects like __CALENDAR__
-    return data.map(s => s.name).filter(name => !name.startsWith('__'));
+    return data.map(s => s.name);
   }
 
   /**

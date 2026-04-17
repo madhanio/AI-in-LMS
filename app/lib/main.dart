@@ -112,29 +112,29 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         elevation: 0,
         title: const Text(
           'Hyderabad Institute of ...',
-          style: TextStyle(color: Colors.black, fontSize: 20, fontWeight: FontWeight.normal),
+          style: const TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.normal),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.search, color: Colors.black, size: 28),
+            icon: const Icon(Icons.search, color: Colors.black, size: 24),
             onPressed: () {},
           ),
-          Builder(
-            builder: (context) => Padding(
-              padding: const EdgeInsets.only(right: 16.0),
-              child: InkWell(
-                onTap: () => Scaffold.of(context).openEndDrawer(),
-                child: CircleAvatar(
-                  backgroundColor: Colors.purple[700],
-                  radius: 18,
-                  child: const Text(
-                    'D',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+            child: Consumer<AuthProvider>(
+              builder: (context, auth, _) => Padding(
+                padding: const EdgeInsets.only(right: 16.0),
+                child: InkWell(
+                  onTap: () => Scaffold.of(context).openEndDrawer(),
+                  child: CircleAvatar(
+                    backgroundColor: Colors.purple[700],
+                    radius: 16,
+                    child: Text(
+                      (auth.currentStudent?['name'] ?? 'U')[0].toUpperCase(),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(48),
@@ -148,8 +148,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               unselectedLabelColor: Colors.grey[600],
               indicatorColor: const Color(0xFFF98012),
               indicatorWeight: 3,
-              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               tabs: const [
                 Tab(text: 'Dashboard'),
                 Tab(text: 'Site home'),
@@ -169,11 +169,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           ),
           // Floating arrow button on the right edge
           Positioned(
-            right: -30, 
+            right: -20, 
             top: MediaQuery.of(context).size.height / 2 - 120,
             child: Container(
-              height: 80,
-              width: 80,
+              height: 55,
+              width: 55,
               decoration: BoxDecoration(
                 color: const Color(0xFFE5E7EB),
                 shape: BoxShape.circle,
@@ -189,7 +189,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 alignment: Alignment.centerLeft,
                 child: Padding(
                   padding: EdgeInsets.only(left: 12.0),
-                  child: Icon(Icons.arrow_back_ios_new, size: 20, color: Colors.black87),
+                  child: Icon(Icons.arrow_back_ios_new, size: 16, color: Colors.black87),
                 ),
               ),
             ),
@@ -227,22 +227,22 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           elevation: 0,
           items: [
             const BottomNavigationBarItem(
-              icon: Icon(Icons.speed, size: 28),
+              icon: Icon(Icons.speed, size: 24),
               label: 'Dashboard',
             ),
             const BottomNavigationBarItem(
-              icon: Icon(Icons.school, size: 28), 
+              icon: Icon(Icons.school, size: 24), 
               label: 'Site home',
             ),
             const BottomNavigationBarItem(
-              icon: Icon(Icons.forum, size: 28), 
+              icon: Icon(Icons.forum, size: 24), 
               label: 'Messages',
             ),
             BottomNavigationBarItem(
               icon: Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  const Icon(Icons.notifications, size: 28),
+                  const Icon(Icons.notifications, size: 24),
                   Positioned(
                     right: -4,
                     top: -4,
@@ -274,7 +274,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               label: 'Notifications',
             ),
             const BottomNavigationBarItem(
-              icon: Icon(Icons.more_horiz, size: 28), 
+              icon: Icon(Icons.more_horiz, size: 24), 
               label: 'More',
             ),
           ],
