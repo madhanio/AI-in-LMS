@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY;
+const NVIDIA_VISION_KEY = process.env.NVIDIA_VISION_KEY || NVIDIA_API_KEY;
 const BASE_URL = "https://integrate.api.nvidia.com/v1";
 
 export class AiService {
@@ -262,7 +263,7 @@ export class AiService {
       const response = await fetch(`${BASE_URL}/chat/completions`, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${NVIDIA_API_KEY}`,
+          "Authorization": `Bearer ${NVIDIA_VISION_KEY}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
