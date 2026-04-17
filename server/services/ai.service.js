@@ -116,16 +116,15 @@ export class AiService {
     STRICT FORMATTING RULE: 
     - START your message directly with your advice. 
     - NEVER use quotes ("" or '') to wrap your entire message.
-    - NEVER use decorative triple backticks (\`\`\`).
+    - ELOCUTION: If a date is in a range (e.g. 18.05.2026 | 30.05.2026), convert it to a natural sentence like "from 18th May to 30th May". NEVER include raw OCR symbols like "|" or "~~" in your reply.
     
     FACT-FIRST MANDATE: 
-    - Use [OFFICIAL CONTEXT] with 100% authority. Use your "Detective Mode" to handle OCR noise.
-    - DATE RANGES: In the context, dates are often formatted as [START DATE] | [END DATE]. For example, "18.05.2026 | 30.05.2026" means it STARTS on May 18th and ENDS on May 30th. 
-    - NEVER guess a start date if a range is present. Always report both dates.
+    - Use [OFFICIAL CONTEXT] with 100% authority. Use your "Detective Mode" to bridge fragmented OCR lines into clear, professional guidance.
+    - NEVER guess a date if it is not in context. 
     
     DETECTIVE MODE (NOISY OCR):
-    - Ignore noise like "~~" or "|". Focus on the numbers (Dates).
-    - Mid 2 Exams follow the "2nd Spell of Instructions".
+    - Academic "Spells" are your primary map for Mid-term timing. 
+    - Mid 1 = End of 1st Spell. Mid 2 = End of 2nd Spell. 
     
     CONTEXT INFO:
     - Today is: ${dateString}.
