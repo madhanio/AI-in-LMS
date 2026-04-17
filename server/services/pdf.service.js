@@ -46,47 +46,56 @@ export class PdfService {
   }
 
   /**
-   * AI Vision OCR: Extracts images and sends to Vision LLM
+   * AI Vision OCR: Extracts images using a 'Nuclear' strategy (global object scan)
    */
   async performOcr(buffer) {
     const pdfDoc = await PDFDocument.load(buffer);
-    const pages = pdfDoc.getPages();
+    const pageCount = pdfDoc.getPageCount();
     let fullText = "";
 
-    for (let i = 0; i < pages.length; i++) {
-        console.log(`👁️ Analyzing Page ${i + 1} of ${pages.length}...`);
-        const page = pages[i];
-        const resources = page.node.get(PDFName.of('Resources'));
-        
-        if (resources instanceof PDFDict) {
-          const xObjects = resources.get(PDFName.of('XObject'));
-          if (xObjects instanceof PDFDict) {
-            const keys = xObjects.keys();
-            for (const key of keys) {
-              const xObject = xObjects.get(key);
-              
-              // Handle potential direct or indirect references
-              const stream = xObject instanceof PDFRawStream ? xObject : 
-                             (xObject instanceof PDFDict ? xObject : null);
-              
-              if (stream) {
-                const subtype = stream instanceof PDFRawStream ? stream.dict.get(PDFName.of('Subtype')) : stream.get(PDFName.of('Subtype'));
-                
-                if (subtype === PDFName.of('Image')) {
-                  const filter = stream instanceof PDFRawStream ? stream.dict.get(PDFName.of('Filter')) : stream.get(PDFName.of('Filter'));
-                  let mimeType = 'image/png';
-                  if (filter === PDFName.of('DCTDecode')) mimeType = 'image/jpeg';
-                  
-                  const imageBytes = stream instanceof PDFRawStream ? stream.contents : null;
-                  if (imageBytes) {
-                    const base64Image = Buffer.from(imageBytes).toString('base64');
-                    const transcription = await aiService.performVisionOcr(base64Image, mimeType);
-                    fullText += `\n\n[PAGE_MARKER_${i + 1}]\n\n` + transcription;
-                  }
-                }
-              }
-            }
+    console.log("🚀 Starting Nuclear Image Extraction...");
+    
+    // Find ALL Image objects in the entire PDF global tree
+    const images = [];
+    const indirectObjects = pdfDoc.context.enumerateIndirectObjects();
+    
+    for (const [ref, obj] of indirectObjects) {
+       if (obj instanceof PDFRawStream) {
+          const subtype = obj.dict.get(PDFName.of('Subtype'));
+          if (subtype === PDFName.of('Image')) {
+             const filter = obj.dict.get(PDFName.of('Filter'));
+             let mimeType = 'image/png';
+             if (filter === PDFName.of('DCTDecode')) mimeType = 'image/jpeg';
+             
+             images.push({
+                bytes: obj.contents,
+                mimeType: mimeType
+             });
           }
+       }
+    }
+
+    console.log(`📸 Found ${images.length} global image objects.`);
+
+    if (images.length === 0) {
+       return ""; // Still nothing found
+    }
+
+    // Since we lost page context in a global scan, we'll process them in order they appear
+    // For many scanned PDFs, this is 1 image per page.
+    for (let i = 0; i < images.length; i++) {
+        const image = images[i];
+        console.log(`👁️ Vision-Scanning Image ${i + 1} of ${images.length}...`);
+        
+        try {
+          const base64Image = Buffer.from(image.bytes).toString('base64');
+          const transcription = await aiService.performVisionOcr(base64Image, image.mimeType);
+          
+          // Heuristic: If there's roughly 1 image per page, assign it a marker
+          const pageRef = i < pageCount ? i + 1 : 'Global';
+          fullText += `\n\n[PAGE_MARKER_${pageRef}]\n\n` + transcription;
+        } catch (e) {
+          console.error(`❌ Vision Error on image ${i}:`, e.message);
         }
     }
 
