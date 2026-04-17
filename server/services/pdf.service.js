@@ -1,11 +1,12 @@
 import pdfParse from "pdf-parse";
 import { PDFDocument, PDFName, PDFDict, PDFRawStream } from "pdf-lib";
+import { createWorker } from "tesseract.js";
 import { aiService } from "./ai.service.js";
 
 export class PdfService {
   /**
    * Extracts text from PDF buffer and injects page markers.
-   * Now includes HIGH-ACCURACY AI Vision fallback for scanned documents!
+   * Now includes RESILIENT TRIPLE-PASS OCR fallback!
    */
   async extractText(buffer) {
     // 1. Try standard extraction first
@@ -29,16 +30,16 @@ export class PdfService {
     const data = await pdfParse(buffer, { pagerender: render_page });
     let text = data.text || "";
 
-    // 2. AI Vision Fallback: If text is suspiciously small (scanned image)
+    // 2. OCR Fallback: If text is suspiciously small (scanned image)
     if (text.trim().length < 100) {
-      console.log("🧩 Scanned PDF detected. Triggering High-Accuracy AI Vision Engine...");
+      console.log("🧩 Scanned PDF detected. Triggering Resilient OCR Pipeline...");
       try {
         const ocrText = await this.performOcr(buffer);
-        if (ocrText.trim().length > 0) {
+        if (ocrText && ocrText.trim().length > 0) {
            text = ocrText;
         }
       } catch (ocrError) {
-        console.error("❌ Vision Fallback Failed:", ocrError);
+        console.error("❌ High-Level OCR Pipeline Failed:", ocrError);
       }
     }
 
@@ -46,18 +47,16 @@ export class PdfService {
   }
 
   /**
-   * AI Vision OCR: Extracts images using a 'Nuclear' strategy (global object scan)
+   * Triple-Pass OCR: AI Vision (for tables) with Tesseract Safety Net (for size/reliability)
    */
   async performOcr(buffer) {
     const pdfDoc = await PDFDocument.load(buffer);
     const pageCount = pdfDoc.getPageCount();
     let fullText = "";
 
-    console.log("🚀 Starting Nuclear Image Extraction...");
-    
-    // Find ALL Image objects in the entire PDF global tree
-    const images = [];
+    console.log("🚀 Starting Global Object Scan...");
     const indirectObjects = pdfDoc.context.enumerateIndirectObjects();
+    const images = [];
     
     for (const [ref, obj] of indirectObjects) {
        if (obj instanceof PDFRawStream) {
@@ -67,36 +66,45 @@ export class PdfService {
              let mimeType = 'image/png';
              if (filter === PDFName.of('DCTDecode')) mimeType = 'image/jpeg';
              
-             images.push({
-                bytes: obj.contents,
-                mimeType: mimeType
-             });
+             images.push({ bytes: obj.contents, mimeType: mimeType });
           }
        }
     }
 
-    console.log(`📸 Found ${images.length} global image objects.`);
+    console.log(`📸 Found ${images.length} candidate images.`);
 
-    if (images.length === 0) {
-       return ""; // Still nothing found
-    }
+    if (images.length === 0) return "";
 
-    // Since we lost page context in a global scan, we'll process them in order they appear
-    // For many scanned PDFs, this is 1 image per page.
-    for (let i = 0; i < images.length; i++) {
-        const image = images[i];
-        console.log(`👁️ Vision-Scanning Image ${i + 1} of ${images.length}...`);
-        
-        try {
-          const base64Image = Buffer.from(image.bytes).toString('base64');
-          const transcription = await aiService.performVisionOcr(base64Image, image.mimeType);
+    // Initialize Tesseract as the 'Safety Net'
+    const worker = await createWorker('eng');
+
+    try {
+      for (let i = 0; i < images.length; i++) {
+          const image = images[i];
+          console.log(`👁️ Processing Image ${i + 1} of ${images.length}...`);
           
-          // Heuristic: If there's roughly 1 image per page, assign it a marker
+          let transcription = null;
+          const base64Image = Buffer.from(image.bytes).toString('base64');
+          
+          // PASS 2: Attempt High-Accuracy AI Vision
+          if (base64Image.length < 5000000) { // < 5MB (Safe threshold for Vision NIM)
+            transcription = await aiService.performVisionOcr(base64Image, image.mimeType);
+          } else {
+            console.log("⚠️ Image too large for Cloud Vision. Skipping to Safety Net...");
+          }
+
+          // PASS 3: Tesseract Safety Net (Legacy Fallback)
+          if (!transcription || transcription.includes("[Error")) {
+            console.log("🛡️ Cloud extraction failed/skipped. Running local Tesseract...");
+            const result = await worker.recognize(Buffer.from(image.bytes));
+            transcription = result.data.text;
+          }
+
           const pageRef = i < pageCount ? i + 1 : 'Global';
           fullText += `\n\n[PAGE_MARKER_${pageRef}]\n\n` + transcription;
-        } catch (e) {
-          console.error(`❌ Vision Error on image ${i}:`, e.message);
-        }
+      }
+    } finally {
+      await worker.terminate();
     }
 
     return fullText;

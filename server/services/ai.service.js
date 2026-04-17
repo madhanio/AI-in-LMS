@@ -262,7 +262,9 @@ export class AiService {
       });
 
       if (!response.ok) {
-        throw new Error(`Vision API Error: ${await response.text()}`);
+        const errorText = await response.text();
+        console.error(`⚠️ Vision API Error (${response.status}): ${errorText}`);
+        return null; // Return null to trigger local Tesseract fallback
       }
 
       const data = await response.json();
@@ -271,7 +273,7 @@ export class AiService {
       return transcription;
     } catch (e) {
       console.error("Vision OCR Error:", e.message);
-      return "[Error during AI Vision transcription]";
+      return null;
     }
   }
 }
