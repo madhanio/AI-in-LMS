@@ -169,7 +169,7 @@ export class AiService {
     
     STRICT FORMATTING RULE: 
     - NEVER wrap your entire response in quotes ("" or '').
-    - NEVER use triple backticks (```) to wrap your entire message.
+    - NEVER use triple backticks (\`\`\`) to wrap your entire message.
     - START your message directly with the first word of your advice. 
     - No decorative punctuation or conversational 'fences' around your speech.
     
