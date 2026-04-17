@@ -1,5 +1,5 @@
 import pdfParse from "pdf-parse";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, PDFName, PDFDict, PDFRawStream } from "pdf-lib";
 import { aiService } from "./ai.service.js";
 
 export class PdfService {
@@ -33,7 +33,10 @@ export class PdfService {
     if (text.trim().length < 100) {
       console.log("🧩 Scanned PDF detected. Triggering High-Accuracy AI Vision Engine...");
       try {
-        text = await this.performOcr(buffer);
+        const ocrText = await this.performOcr(buffer);
+        if (ocrText.trim().length > 0) {
+           text = ocrText;
+        }
       } catch (ocrError) {
         console.error("❌ Vision Fallback Failed:", ocrError);
       }
@@ -47,35 +50,41 @@ export class PdfService {
    */
   async performOcr(buffer) {
     const pdfDoc = await PDFDocument.load(buffer);
-    const pageCount = pdfDoc.getPageCount();
+    const pages = pdfDoc.getPages();
     let fullText = "";
 
-    for (let i = 0; i < pageCount; i++) {
-        console.log(`👁️ Vision-Scanning Page ${i + 1} of ${pageCount}...`);
-        const page = pdfDoc.getPage(i);
+    for (let i = 0; i < pages.length; i++) {
+        console.log(`👁️ Analyzing Page ${i + 1} of ${pages.length}...`);
+        const page = pages[i];
+        const resources = page.node.get(PDFName.of('Resources'));
         
-        // Extract images from page
-        const pageResources = page.node.Resources();
-        const xObjects = pageResources ? pageResources.get(PDFDocument.name('XObject')) : null;
-        
-        if (xObjects) {
-          const keys = xObjects.keys();
-          for (const key of keys) {
-            const xObject = xObjects.get(key);
-            if (xObject.get(PDFDocument.name('Subtype')).value === 'Image') {
-              // Extract raw image data
-              const imageBytes = xObject.contents;
-              const filter = xObject.get(PDFDocument.name('Filter')).value;
+        if (resources instanceof PDFDict) {
+          const xObjects = resources.get(PDFName.of('XObject'));
+          if (xObjects instanceof PDFDict) {
+            const keys = xObjects.keys();
+            for (const key of keys) {
+              const xObject = xObjects.get(key);
               
-              // Determine mime type (Scanned PDFs are usually JPEGs)
-              let mimeType = 'image/png'; 
-              if (filter === 'DCTDecode') mimeType = 'image/jpeg';
+              // Handle potential direct or indirect references
+              const stream = xObject instanceof PDFRawStream ? xObject : 
+                             (xObject instanceof PDFDict ? xObject : null);
               
-              const base64Image = Buffer.from(imageBytes).toString('base64');
-              
-              // CALL THE HIGH-ACCURACY VISION ENGINE
-              const transcription = await aiService.performVisionOcr(base64Image, mimeType);
-              fullText += `\n\n[PAGE_MARKER_${i + 1}]\n\n` + transcription;
+              if (stream) {
+                const subtype = stream instanceof PDFRawStream ? stream.dict.get(PDFName.of('Subtype')) : stream.get(PDFName.of('Subtype'));
+                
+                if (subtype === PDFName.of('Image')) {
+                  const filter = stream instanceof PDFRawStream ? stream.dict.get(PDFName.of('Filter')) : stream.get(PDFName.of('Filter'));
+                  let mimeType = 'image/png';
+                  if (filter === PDFName.of('DCTDecode')) mimeType = 'image/jpeg';
+                  
+                  const imageBytes = stream instanceof PDFRawStream ? stream.contents : null;
+                  if (imageBytes) {
+                    const base64Image = Buffer.from(imageBytes).toString('base64');
+                    const transcription = await aiService.performVisionOcr(base64Image, mimeType);
+                    fullText += `\n\n[PAGE_MARKER_${i + 1}]\n\n` + transcription;
+                  }
+                }
+              }
             }
           }
         }
