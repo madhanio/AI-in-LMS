@@ -267,12 +267,16 @@ export class AiService {
           model: "google/gemma-3-27b-it",
           messages: [{ role: "user", content }],
           max_tokens: 4096,
-          temperature: 0.1,
-          response_format: { type: "json_object" }
+          temperature: 0.1
+          // response_format might not be supported by all NIM models, fallback to strict prompt
         })
       });
 
-      if (!response.ok) throw new Error(`Gemma 3 Vision Error: ${await response.text()}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ NVIDIA API Detailed Error [${response.status}]:`, errorText);
+        throw new Error(`Gemma 3 Vision API returned ${response.status}`);
+      }
       
       const data = await response.json();
       const rawContent = this.cleanJsonResponse(data.choices[0]?.message?.content);

@@ -142,6 +142,7 @@ export class PdfService {
     const chunks = [];
     
     // We can run a state machine to track the current page.
+    let currentIndex = 0;
     let currentPage = 1;
     let currentSection = "General";
 
