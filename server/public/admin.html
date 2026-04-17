@@ -378,8 +378,28 @@
     <script>
         lucide.createIcons();
 
+        // SECURITY: Inactivity Logout
+        let inactivityTimer;
+        const INACTIVITY_LIMIT = 15 * 60 * 1000; // 15 Minutes
+
+        function resetInactivityTimer() {
+            if (inactivityTimer) clearTimeout(inactivityTimer);
+            inactivityTimer = setTimeout(() => {
+                const isDashboardVisible = document.getElementById('mainDashboard').style.display === 'flex';
+                if (isDashboardVisible) {
+                    logout("Security timeout: Session expired due to inactivity.");
+                }
+            }, INACTIVITY_LIMIT);
+        }
+
+        // Register Activity Listeners
+        ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(evt => {
+            window.addEventListener(evt, resetInactivityTimer, true);
+        });
+
         // Check auth on load
         window.onload = async () => {
+            resetInactivityTimer();
             try {
                 const res = await fetch('/api/check-auth');
                 if (res.ok) {
@@ -412,6 +432,7 @@
             document.getElementById('mainDashboard').style.display = 'flex';
             setTimeout(() => {
                 document.getElementById('mainDashboard').style.opacity = '1';
+                resetInactivityTimer();
             }, 10);
             loadData();
         }
@@ -521,9 +542,21 @@
             }
         }
 
-        async function logout() {
+        async function logout(reason = null) {
             await fetch('/api/logout', { method: 'POST' });
-            location.reload();
+            if (reason) {
+                // Stay on page but show login screen and toast
+                location.href = '/admin?reason=' + encodeURIComponent(reason);
+            } else {
+                location.reload();
+            }
+        }
+
+        // Logic to show reason from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const reason = urlParams.get('reason');
+        if (reason) {
+            setTimeout(() => showToast(reason, true), 500);
         }
 
         function showTab(tabId, el) {
