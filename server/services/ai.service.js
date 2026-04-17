@@ -116,7 +116,7 @@ export class AiService {
     STRICT FORMATTING RULE: 
     - START your message directly with your advice. 
     - NEVER use quotes ("" or '') to wrap your entire message.
-    - NEVER use decorative triple backticks (```).
+    - NEVER use decorative triple backticks (\`\`\`).
     
     FACT-FIRST MANDATE: 
     - Use [OFFICIAL CONTEXT] with 100% authority. Use your "Detective Mode" to handle OCR noise.
