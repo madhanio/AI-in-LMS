@@ -225,95 +225,67 @@ export class AiService {
     }
   }
 
-  /**
-   * Converts raw tables into structured JSON events
-   */
-  async parseTableToEvents(extractedTables, fileName) {
-    try {
-      const tableData = JSON.stringify(extractedTables);
-      const response = await fetch(`${BASE_URL}/chat/completions`, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${NVIDIA_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "meta/llama-3.1-8b-instruct",
-          messages: [
-            {
-              role: "system",
-              content: `Extract all calendar events from the following table data.
-              Return ONLY a JSON object with an "events" array. No explanation, no markdown.
-
-              Each object must have exactly these fields:
-              - event_name: string
-              - date_from: "YYYY-MM-DD" or null
-              - date_to: "YYYY-MM-DD" or null  
-              - date_raw: original date string as it appears in text
-              - date_is_approximate: boolean
-              - semester: string (e.g., I-I, II-II)`
-            },
-            { role: "user", content: `DATA: ${tableData}` }
-          ],
-          temperature: 0.1,
-          response_format: { type: "json_object" }
-        })
-      });
-      
-      const data = await response.json();
-      const content = this.cleanJsonResponse(data.choices[0]?.message?.content);
-      const parsed = JSON.parse(content);
-      
-      return (parsed.events || []).map(event => ({
-        ...event,
-        source_file: fileName
-      }));
-    } catch (e) {
-      console.error("Structured Parsing Error:", e);
-      return [];
-    }
   }
 
+
   /**
-   * Converts raw text (OCR output) into structured JSON events
-   * Used as a fallback when pdfplumber can't find vector tables
+   * Multimodal structured extraction using Gemma 3 Vision via NVIDIA NIM
    */
-  async parseTextToEvents(text, fileName) {
-    if (!text) return [];
+  async extractCalendarEventsFromImages(base64Images, fileName) {
     try {
+      console.log(`🧠 Invoking Gemma 3 Vision for ${base64Images.length} images...`);
+      
+      const content = [
+        { 
+          type: "text", 
+          text: `Extract all academic calendar events from these images.
+          Return ONLY a JSON object with an "events" array. No explanation, no markdown.
+
+          Each object must have exactly these fields:
+          - event_name: string
+          - date_from: "YYYY-MM-DD" or null
+          - date_to: "YYYY-MM-DD" or null  
+          - date_raw: original date string as it appears in text
+          - date_is_approximate: boolean
+          - semester: string (e.g., I-I, II-II)`
+        }
+      ];
+
+      // Add each image as a part
+      base64Images.forEach(b64 => {
+        content.push({
+          type: "image_url",
+          image_url: { url: `data:image/png;base64,${b64}` }
+        });
+      });
+
       const response = await fetch(`${BASE_URL}/chat/completions`, {
         method: "POST",
-        headers: { "Authorization": `Bearer ${NVIDIA_API_KEY}`, "Content-Type": "application/json" },
+        headers: {
+          "Authorization": `Bearer ${NVIDIA_API_KEY}`,
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({
-          model: "meta/llama-3.1-8b-instruct",
-          messages: [
-            {
-              role: "system",
-              content: `Extract all calendar events from the following OCR text.
-              Return ONLY a JSON array. No explanation, no markdown.
-
-              Each object must have exactly these fields:
-              - event_name: string
-              - date_from: "YYYY-MM-DD" or null
-              - date_to: "YYYY-MM-DD" or null  
-              - date_raw: original date string as it appears in text
-              - date_is_approximate: boolean
-              - semester: string (e.g., I-I, II-II)`
-            },
-            { role: "user", content: `OCR TEXT:\n${text.slice(0, 10000)}` }
-          ],
+          model: "google/gemma-3-27b-it",
+          messages: [{ role: "user", content }],
+          max_tokens: 4096,
           temperature: 0.1,
           response_format: { type: "json_object" }
         })
       });
+
+      if (!response.ok) throw new Error(`Gemma 3 Vision Error: ${await response.text()}`);
       
       const data = await response.json();
-      const content = this.cleanJsonResponse(data.choices[0]?.message?.content);
-      const parsed = JSON.parse(content);
+      const rawContent = this.cleanJsonResponse(data.choices[0]?.message?.content);
+      const parsed = JSON.parse(rawContent);
       
       return (parsed.events || []).map(event => ({
         ...event,
         source_file: fileName
       }));
-    } catch (e) {
-      console.error("Text-based Structured Parsing Error:", e);
+    } catch (error) {
+      console.error("❌ Gemma 3 Vision Extraction Failed:", error);
       return [];
     }
   }

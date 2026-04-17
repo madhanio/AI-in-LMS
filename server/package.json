@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.0",
+    "canvas": "^3.2.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -20,6 +21,7 @@
     "openai": "^4.52.0",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^1.1.1",
+    "pdfjs-dist": "^5.6.205",
     "tesseract.js": "^7.0.0"
   }
 }

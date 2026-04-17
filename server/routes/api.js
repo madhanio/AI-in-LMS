@@ -99,36 +99,26 @@ router.post('/upload', authenticateAdmin, upload.single('pdfFile'), async (req, 
     console.log(`Content classification for ${fileName}: ${contentType} (Source: ${source})`);
 
     if (contentType === 'TABULAR' || subject === '__CALENDAR__') {
-       console.log("➡️ Routing to Structured Data Lane...");
-       let events = [];
-
-       // Branch 1: Vector PDFs with potential tables
-       if (source === 'vector') {
-          console.log("📊 Vector PDF detected. Attempting pdfplumber extraction...");
-          const tables = await pdfService.extractTables(req.file.buffer);
-          if (tables.length > 0) {
-             console.log("✅ Vector tables found. Parsing via Table Lane...");
-             events = await aiService.parseTableToEvents(tables, fileName);
-          }
-       }
+       console.log("➡️ Routing to Direct-to-VLM Structured Lane...");
        
-       // Branch 2: OCR Fallback or Direct (for Scanned PDFs/Missing Vector Tables)
-       if (events.length === 0) {
-          console.log("👁️ No vector tables. Passing OCR/Text directly to LLM Extractor...");
-          events = await aiService.parseTextToEvents(text, fileName);
-       }
+       try {
+         const imageBase64s = await pdfService.convertToImages(req.file.buffer);
+         const events = await aiService.extractCalendarEventsFromImages(imageBase64s, fileName);
 
-       if (events.length > 0) {
-         await storageService.saveCalendarEvents(events);
-         return res.json({ 
-           message: "PDF processed via Structured Data Lane", 
-           type: "tabular",
-           eventsExtracted: events.length,
-           method: source === 'vector' ? "vector_table" : "llm_text_extraction"
-         });
+         if (events.length > 0) {
+           await storageService.saveCalendarEvents(events);
+           return res.json({ 
+             message: "PDF processed via Direct-to-VLM Lane", 
+             type: "tabular",
+             eventsExtracted: events.length,
+             method: "gemma_3_vision"
+           });
+         }
+         console.log("⚠️ VLM extracted 0 events. Falling back to RAG.");
+       } catch (vlmError) {
+         console.error("❌ Direct-to-VLM Lane Failed:", vlmError);
+         console.log("⚠️ Falling back to standard RAG pipeline.");
        }
-       
-       console.log("❌ Both structured extraction methods failed. Falling back to RAG.");
     }
 
     const chunks = pdfService.chunkText(text);

@@ -6,6 +6,7 @@ import { spawnSync } from "child_process";
 import fs from "fs";
 import path from "path";
 import os from "os";
+import pdfConverter from "pdf-img-convert";
 
 export class PdfService {
   /**
@@ -208,51 +209,25 @@ export class PdfService {
     return chunks;
   }
 
+  }
+
   /**
-   * Extracts tables from PDF buffer using pdfplumber (via Python helper)
+   * Converts all pages of a PDF buffer into an array of image buffers (Base64 ready)
    */
-  async extractTables(buffer) {
-    const tempFilePath = path.join(os.tmpdir(), `temp_${Date.now()}.pdf`);
-    
+  async convertToImages(buffer) {
     try {
-      // Write buffer to temp file
-      fs.writeFileSync(tempFilePath, buffer);
+      console.log("📸 Converting PDF to high-quality images for VLM Lane...");
       
-      const scriptPath = path.resolve("utils", "table_extractor.py");
-      console.log(`🎬 Running table extraction via Python: ${scriptPath}`);
+      // pdf-img-convert returns an array of Uint8Arrays
+      const images = await pdfConverter.convert(buffer, {
+        width: 1200,      // Sufficient for table reading
+        density: 200,    // High resolution for clear text
+      });
       
-      const result = spawnSync("python", [scriptPath, tempFilePath], { encoding: "utf8" });
-      
-      if (result.error) {
-        console.error("❌ Python Execution Error:", result.error);
-        return [];
-      }
-
-      if (result.status !== 0) {
-        console.error("❌ Python Helper Failed:", result.stderr);
-        return [];
-      }
-
-      try {
-        const tables = JSON.parse(result.stdout);
-        if (tables.error) {
-          console.error("❌ Extraction Script Error:", tables.error);
-          return [];
-        }
-        return tables;
-      } catch (parseError) {
-        console.error("❌ Error parsing extraction JSON:", parseError);
-        console.log("Raw Output:", result.stdout);
-        return [];
-      }
+      return images.map(img => Buffer.from(img).toString("base64"));
     } catch (error) {
-      console.error("❌ Table Extraction Failed:", error);
-      return [];
-    } finally {
-      // Cleanup
-      if (fs.existsSync(tempFilePath)) {
-        fs.unlinkSync(tempFilePath);
-      }
+      console.error("❌ PDF-to-Image Conversion Failed:", error);
+      throw error;
     }
   }
 }
