@@ -78,8 +78,8 @@ export class StorageService {
        return {};
     }
 
-    // Initialize with all subjects (even empty ones)
-    const subjects = {};
+    // Initialize with all subjects (and ensure __CALENDAR__ exists even if not in subject table)
+    const subjects = { '__CALENDAR__': [] };
     subjectList.forEach(s => subjects[s] = []);
 
     // Group files by subject
@@ -102,6 +102,11 @@ export class StorageService {
   }
 
   async addFile(subject, fileName, chunksWithEmbeds) {
+    if (subject === '__CALENDAR__' && chunksWithEmbeds.length === 0) {
+       console.log("⚠️ Ignoring empty calendar sync to avoid data loss.");
+       return false;
+    }
+
     const rows = chunksWithEmbeds.map(chunk => ({
       subject,
       file_name: fileName,

@@ -105,7 +105,11 @@ router.post('/upload', authenticateAdmin, upload.single('pdfFile'), async (req, 
     }));
 
     await storageService.addFile(subject, fileName, chunksWithEmbeds);
-    res.json({ message: "PDF processed successfully", chunks: chunks.length });
+    res.json({ 
+      message: chunks.length > 0 ? "PDF processed successfully" : "⚠️ Success, but no readable text found.", 
+      chunks: chunks.length,
+      warning: chunks.length === 0 ? "Empty content" : null
+    });
   } catch (error) {
     console.error("Upload Error:", error);
     res.status(500).json({ error: error.message });

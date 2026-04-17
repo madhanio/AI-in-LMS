@@ -524,7 +524,7 @@
                 const res = await fetch('/api/upload', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (res.ok) {
-                    showToast('📅 Schedule Synced Successfully');
+                    showToast(data.message || '📅 Schedule Synced Successfully', data.chunks === 0);
                     loadCalendarDetails();
                     document.getElementById('calendarInput').value = '';
                 } else {
@@ -639,7 +639,12 @@
             const data = await res.json();
             const docs = data.subjects['__CALENDAR__'] || [];
             const list = document.getElementById('calendarFiles');
-            list.innerHTML = '';
+            list.innerHTML = docs.length ? '' : `
+                <div style="text-align: center; color: var(--text-dim); padding: 2rem; opacity: 0.5;">
+                    <i data-lucide="inbox" style="width: 32px; margin-bottom: 0.5rem"></i>
+                    <p>No readable data yet</p>
+                </div>
+            `;
             docs.forEach(d => {
                 list.innerHTML += `
                     <div class="file-item">
