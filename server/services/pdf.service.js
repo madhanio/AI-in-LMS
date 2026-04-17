@@ -1,11 +1,11 @@
 import pdfParse from "pdf-parse";
 import { PDFDocument } from "pdf-lib";
-import { createWorker } from "tesseract.js";
+import { aiService } from "./ai.service.js";
 
 export class PdfService {
   /**
    * Extracts text from PDF buffer and injects page markers.
-   * Now includes AI OCR fallback for scanned documents!
+   * Now includes HIGH-ACCURACY AI Vision fallback for scanned documents!
    */
   async extractText(buffer) {
     // 1. Try standard extraction first
@@ -29,13 +29,13 @@ export class PdfService {
     const data = await pdfParse(buffer, { pagerender: render_page });
     let text = data.text || "";
 
-    // 2. OCR Fallback: If text is suspiciously small (likely a scanned image)
+    // 2. AI Vision Fallback: If text is suspiciously small (scanned image)
     if (text.trim().length < 100) {
-      console.log("🧩 Empty/Scanned PDF detected. Triggering AI OCR fallback...");
+      console.log("🧩 Scanned PDF detected. Triggering High-Accuracy AI Vision Engine...");
       try {
         text = await this.performOcr(buffer);
       } catch (ocrError) {
-        console.error("❌ OCR Fallback Failed:", ocrError);
+        console.error("❌ Vision Fallback Failed:", ocrError);
       }
     }
 
@@ -43,23 +43,18 @@ export class PdfService {
   }
 
   /**
-   * Pure JS OCR implementation using Tesseract
+   * AI Vision OCR: Extracts images and sends to Vision LLM
    */
   async performOcr(buffer) {
     const pdfDoc = await PDFDocument.load(buffer);
     const pageCount = pdfDoc.getPageCount();
     let fullText = "";
 
-    // Initialize Tesseract Worker
-    const worker = await createWorker('eng');
-
-    try {
-      for (let i = 0; i < pageCount; i++) {
-        console.log(`👁️ Scanning Page ${i + 1} of ${pageCount}...`);
+    for (let i = 0; i < pageCount; i++) {
+        console.log(`👁️ Vision-Scanning Page ${i + 1} of ${pageCount}...`);
         const page = pdfDoc.getPage(i);
         
-        // Deep Dive: Scanned PDFs usually have one large Image object per page
-        // We'll extract all images from this page and OCR them.
+        // Extract images from page
         const pageResources = page.node.Resources();
         const xObjects = pageResources ? pageResources.get(PDFDocument.name('XObject')) : null;
         
@@ -67,17 +62,23 @@ export class PdfService {
           const keys = xObjects.keys();
           for (const key of keys) {
             const xObject = xObjects.get(key);
-            // Check if it's an Image
             if (xObject.get(PDFDocument.name('Subtype')).value === 'Image') {
+              // Extract raw image data
               const imageBytes = xObject.contents;
-              const { data: { text } } = await worker.recognize(Buffer.from(imageBytes));
-              fullText += `\n\n[PAGE_MARKER_${i + 1}]\n\n` + text;
+              const filter = xObject.get(PDFDocument.name('Filter')).value;
+              
+              // Determine mime type (Scanned PDFs are usually JPEGs)
+              let mimeType = 'image/png'; 
+              if (filter === 'DCTDecode') mimeType = 'image/jpeg';
+              
+              const base64Image = Buffer.from(imageBytes).toString('base64');
+              
+              // CALL THE HIGH-ACCURACY VISION ENGINE
+              const transcription = await aiService.performVisionOcr(base64Image, mimeType);
+              fullText += `\n\n[PAGE_MARKER_${i + 1}]\n\n` + transcription;
             }
           }
         }
-      }
-    } finally {
-      await worker.terminate();
     }
 
     return fullText;

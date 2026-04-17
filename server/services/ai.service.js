@@ -218,6 +218,56 @@ export class AiService {
 
     return response.body; // Returns the readable stream
   }
+
+  /**
+   * AI Vision Engine: Extracts text and tables from images using Multimodal LLMs
+   */
+  async performVisionOcr(base64Image, mimeType = "image/png") {
+    try {
+      console.log(`👁️ Calling AI Vision Engine (${mimeType}) for transcription...`);
+      const response = await fetch(`${BASE_URL}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${NVIDIA_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "nvidia/llama-3.2-11b-vision-instruct",
+          messages: [
+            {
+              role: "user",
+              content: [
+                { 
+                  type: "text", 
+                  text: "You are an OCR expert. Precisely transcribe every detail from this academic document. If you see a timetable, schedule, or list, format it as a clean Markdown table to preserve the original structure. Ignore background noise. Be 100% accurate with dates, times, and subject names." 
+                },
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: `data:${mimeType};base64,${base64Image}`
+                  }
+                }
+              ]
+            }
+          ],
+          max_tokens: 4096,
+          temperature: 0.1
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Vision API Error: ${await response.text()}`);
+      }
+
+      const data = await response.json();
+      const transcription = data.choices[0]?.message?.content || "";
+      console.log("✅ AI Vision transcription complete.");
+      return transcription;
+    } catch (e) {
+      console.error("Vision OCR Error:", e.message);
+      return "[Error during AI Vision transcription]";
+    }
+  }
 }
 
 export const aiService = new AiService();
