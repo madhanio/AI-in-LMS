@@ -6,7 +6,7 @@ import 'providers/chat_provider.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'constants.dart';
-import 'screens/connect_site_screen.dart';
+import 'screens/login_screen.dart';
 import 'providers/auth_provider.dart';
 
 void main() async {
@@ -73,7 +73,7 @@ class AuthWrapper extends StatelessWidget {
         if (auth.isAuthenticated) {
           return const DashboardScreen();
         }
-        return const ConnectSiteScreen();
+        return const LoginScreen();
       },
     );
   }
@@ -617,7 +617,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     await Provider.of<AuthProvider>(context, listen: false).logOut();
                     if (!context.mounted) return;
                     Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => const ConnectSiteScreen()),
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
                       (route) => false,
                     );
                   },
