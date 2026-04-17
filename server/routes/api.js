@@ -89,6 +89,11 @@ router.post('/upload', authenticateAdmin, upload.single('pdfFile'), async (req, 
     console.log(`Processing ${fileName} for ${subject}...`);
     const { text, source } = await pdfService.extractText(req.file.buffer);
     
+    if (!text || text.trim().length === 0) {
+      console.log("❌ CRITICAL: No text could be extracted from PDF. Aborting.");
+      return res.status(422).json({ error: "No readable content found in PDF." });
+    }
+
     // 🔥 NEW: Structured Data Lane Classification
     const contentType = await aiService.classifyContent(text);
     console.log(`Content classification for ${fileName}: ${contentType} (Source: ${source})`);

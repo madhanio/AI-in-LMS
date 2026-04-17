@@ -32,7 +32,8 @@ export class PdfService {
     };
 
     const data = await pdfParse(buffer, { pagerender: render_page });
-    let text = data.text || "";
+    let text = data?.text || "";
+    let source = "vector";
 
     // 2. OCR Fallback: If text is suspiciously small (scanned image)
     if (text.trim().length < 100) {
@@ -40,14 +41,15 @@ export class PdfService {
       try {
         const ocrText = await this.performOcr(buffer);
         if (ocrText && ocrText.trim().length > 0) {
-           text = ocrText;
+            text = ocrText;
+            source = "ocr";
         }
       } catch (ocrError) {
         console.error("❌ High-Level OCR Pipeline Failed:", ocrError);
       }
     }
 
-    return text;
+    return { text: text || "", source };
   }
 
   /**
@@ -131,9 +133,12 @@ export class PdfService {
    * Splits text into overlapping chunks and extracts metadata
    */
   chunkText(text, size = 1000, overlap = 200) {
+    if (!text) {
+      console.log("⚠️ chunkText received empty/undefined text. Skipping.");
+      return [];
+    }
     // We clean spaces but keep track of pages
     const chunks = [];
-    let currentIndex = 0;
     
     // We can run a state machine to track the current page.
     let currentPage = 1;

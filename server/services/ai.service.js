@@ -198,6 +198,7 @@ export class AiService {
    * Classifies if the extracted text is primarily tabular (Calendar/Timetable)
    */
   async classifyContent(text) {
+    if (!text) return "TEXT";
     try {
       const response = await fetch(`${BASE_URL}/chat/completions`, {
         method: "POST",
@@ -238,29 +239,18 @@ export class AiService {
           messages: [
             {
               role: "system",
-              content: `Convert the following extracted table data into a structured JSON array of academic events.
-              
-              JSON SCHEMA:
-              {
-                "events": [
-                  {
-                    "semester": "string (e.g., I-I, II-II, or Sem 1)",
-                    "event_name": "string (e.g., Mid Exams, Registration)",
-                    "date_from": "string (ISO format YYYY-MM-DD or null)",
-                    "date_to": "string (ISO format YYYY-MM-DD or null)",
-                    "date_raw": "string (original text from table)",
-                    "date_is_approximate": boolean
-                  }
-                ]
-              }
-              
-              RULES:
-              1. If a date is specific (e.g., 22.09.2025), parse to ISO.
-              2. If a date is vague (e.g., 3rd Week of April), set date_from/to to null and date_is_approximate to true.
-              3. Always keep the original text in date_raw.
-              4. Output ONLY the JSON object.`
+              content: `Extract all calendar events from the following table data.
+              Return ONLY a JSON object with an "events" array. No explanation, no markdown.
+
+              Each object must have exactly these fields:
+              - event_name: string
+              - date_from: "YYYY-MM-DD" or null
+              - date_to: "YYYY-MM-DD" or null  
+              - date_raw: original date string as it appears in text
+              - date_is_approximate: boolean
+              - semester: string (e.g., I-I, II-II)`
             },
-            { role: "user", content: `SOURCE FILE: ${fileName}\n\nDATA: ${tableData}` }
+            { role: "user", content: `DATA: ${tableData}` }
           ],
           temperature: 0.1,
           response_format: { type: "json_object" }
@@ -268,7 +258,7 @@ export class AiService {
       });
       
       const data = await response.json();
-      const content = data.choices[0]?.message?.content;
+      const content = this.cleanJsonResponse(data.choices[0]?.message?.content);
       const parsed = JSON.parse(content);
       
       return (parsed.events || []).map(event => ({
@@ -286,6 +276,7 @@ export class AiService {
    * Used as a fallback when pdfplumber can't find vector tables
    */
   async parseTextToEvents(text, fileName) {
+    if (!text) return [];
     try {
       const response = await fetch(`${BASE_URL}/chat/completions`, {
         method: "POST",
@@ -295,30 +286,18 @@ export class AiService {
           messages: [
             {
               role: "system",
-              content: `You are an expert at extracting academic schedules from unstructured OCR text.
-              
-              JSON SCHEMA:
-              {
-                "events": [
-                  {
-                    "semester": "string (e.g., I-I, II-II, or Sem 1)",
-                    "event_name": "string (e.g., Mid Exams, Registration)",
-                    "date_from": "string (ISO format YYYY-MM-DD or null)",
-                    "date_to": "string (ISO format YYYY-MM-DD or null)",
-                    "date_raw": "string (original text from table)",
-                    "date_is_approximate": boolean
-                  }
-                ]
-              }
-              
-              RULES:
-              1. Extract ALL academic events mentioned in the text.
-              2. If a date is specific (e.g., 22.09.2025), parse to ISO.
-              3. If a date is vague (e.g., 3rd Week of April), set date_from/to to null and date_is_approximate to true.
-              4. Always keep the original date/time description in date_raw.
-              5. Output ONLY the JSON object.`
+              content: `Extract all calendar events from the following OCR text.
+              Return ONLY a JSON array. No explanation, no markdown.
+
+              Each object must have exactly these fields:
+              - event_name: string
+              - date_from: "YYYY-MM-DD" or null
+              - date_to: "YYYY-MM-DD" or null  
+              - date_raw: original date string as it appears in text
+              - date_is_approximate: boolean
+              - semester: string (e.g., I-I, II-II)`
             },
-            { role: "user", content: `SOURCE FILE: ${fileName}\n\nCONTENT:\n${text}` }
+            { role: "user", content: `OCR TEXT:\n${text.slice(0, 10000)}` }
           ],
           temperature: 0.1,
           response_format: { type: "json_object" }
@@ -326,7 +305,7 @@ export class AiService {
       });
       
       const data = await response.json();
-      const content = data.choices[0]?.message?.content;
+      const content = this.cleanJsonResponse(data.choices[0]?.message?.content);
       const parsed = JSON.parse(content);
       
       return (parsed.events || []).map(event => ({
@@ -337,6 +316,26 @@ export class AiService {
       console.error("Text-based Structured Parsing Error:", e);
       return [];
     }
+  }
+
+  /**
+   * Helper to strip conversational text and markdown from JSON responses
+   */
+  cleanJsonResponse(content) {
+     if (!content) return "{}";
+     
+     // Remove markdown code blocks (e.g., ```json ... ```)
+     let cleaned = content.replace(/```json\n?|```\n?/g, "").trim();
+     
+     // Find the first '{' and last '}' to strip conversational prefix/suffix
+     const startIdx = cleaned.indexOf('{');
+     const endIdx = cleaned.lastIndexOf('}');
+     
+     if (startIdx !== -1 && endIdx !== -1) {
+        cleaned = cleaned.substring(startIdx, endIdx + 1);
+     }
+     
+     return cleaned;
   }
 }
 
