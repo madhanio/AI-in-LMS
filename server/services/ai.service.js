@@ -280,6 +280,64 @@ export class AiService {
       return [];
     }
   }
+
+  /**
+   * Converts raw text (OCR output) into structured JSON events
+   * Used as a fallback when pdfplumber can't find vector tables
+   */
+  async parseTextToEvents(text, fileName) {
+    try {
+      const response = await fetch(`${BASE_URL}/chat/completions`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${NVIDIA_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "meta/llama-3.1-8b-instruct",
+          messages: [
+            {
+              role: "system",
+              content: `You are an expert at extracting academic schedules from unstructured OCR text.
+              
+              JSON SCHEMA:
+              {
+                "events": [
+                  {
+                    "semester": "string (e.g., I-I, II-II, or Sem 1)",
+                    "event_name": "string (e.g., Mid Exams, Registration)",
+                    "date_from": "string (ISO format YYYY-MM-DD or null)",
+                    "date_to": "string (ISO format YYYY-MM-DD or null)",
+                    "date_raw": "string (original text from table)",
+                    "date_is_approximate": boolean
+                  }
+                ]
+              }
+              
+              RULES:
+              1. Extract ALL academic events mentioned in the text.
+              2. If a date is specific (e.g., 22.09.2025), parse to ISO.
+              3. If a date is vague (e.g., 3rd Week of April), set date_from/to to null and date_is_approximate to true.
+              4. Always keep the original date/time description in date_raw.
+              5. Output ONLY the JSON object.`
+            },
+            { role: "user", content: `SOURCE FILE: ${fileName}\n\nCONTENT:\n${text}` }
+          ],
+          temperature: 0.1,
+          response_format: { type: "json_object" }
+        })
+      });
+      
+      const data = await response.json();
+      const content = data.choices[0]?.message?.content;
+      const parsed = JSON.parse(content);
+      
+      return (parsed.events || []).map(event => ({
+        ...event,
+        source_file: fileName
+      }));
+    } catch (e) {
+      console.error("Text-based Structured Parsing Error:", e);
+      return [];
+    }
+  }
 }
 
 export const aiService = new AiService();

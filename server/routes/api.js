@@ -97,17 +97,34 @@ router.post('/upload', authenticateAdmin, upload.single('pdfFile'), async (req, 
        console.log("➡️ Routing to Structured Data Lane (Calendar/Table detected)...");
        const tables = await pdfService.extractTables(req.file.buffer);
        
++      let events = [];
        if (tables.length > 0) {
-         const events = await aiService.parseTableToEvents(tables, fileName);
-         await storageService.saveCalendarEvents(events);
-         return res.json({ 
-           message: "PDF processed via Structured Data Lane", 
-           type: "tabular",
-           eventsExtracted: events.length 
-         });
+-         const events = await aiService.parseTableToEvents(tables, fileName);
+-         await storageService.saveCalendarEvents(events);
+-         return res.json({ 
+-           message: "PDF processed via Structured Data Lane", 
+-           type: "tabular",
+-           eventsExtracted: events.length 
+-         });
++         console.log("📊 Vector tables found. Parsing via Table Lane...");
++         events = await aiService.parseTableToEvents(tables, fileName);
        } else {
-         console.log("⚠️ Tabular classification but no tables found. Falling back to RAG.");
+-         console.log("⚠️ Tabular classification but no tables found. Falling back to RAG.");
++         console.log("⚠️ No vector tables found (likely a scanned PDF). Falling back to LLM Text Extraction...");
++         events = await aiService.parseTextToEvents(text, fileName);
        }
++
++      if (events.length > 0) {
++        await storageService.saveCalendarEvents(events);
++        return res.json({ 
++          message: "PDF processed via Structured Data Lane", 
++          type: "tabular",
++          eventsExtracted: events.length,
++          method: tables.length > 0 ? "vector_table" : "llm_text_extraction"
++        });
++      }
++      
++      console.log("❌ Both structured extraction methods failed. Falling back to RAG.");
     }
 
     const chunks = pdfService.chunkText(text);
