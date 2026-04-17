@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/message.dart';
 import '../models/chat_session.dart';
+import '../constants.dart';
+
 
 class ChatProvider extends ChangeNotifier {
   final List<Message> _messages = [];
@@ -31,7 +33,8 @@ class ChatProvider extends ChangeNotifier {
   int _lastNotifyTime = 0;
 
   // Base URL configuration
-  final String _baseUrl = 'https://ai-in-lms.onrender.com/api';
+  final String _baseUrl = Constants.apiBaseUrl;
+
 
   ChatProvider() {
     fetchSubjects();
