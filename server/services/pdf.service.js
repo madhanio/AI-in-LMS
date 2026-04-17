@@ -47,6 +47,21 @@ export class PdfService {
   }
 
   /**
+   * Data Preprocessing & Cleaning: Strips OCR artifacts and normalizes text
+   */
+  cleanOcrNoise(text) {
+    if (!text) return "";
+    return text
+      .replace(/~~/g, "") // Remove common Tesseract noise markers
+      .replace(/\|/g, " ") // Normalize table pipes into spaces
+      .replace(/ {2,}/g, " ") // Normalize multiple spaces
+      .replace(/(\d{2})\s(\d{2})\s(\d{4})/g, "$1.$2.$3") // Fix broken dates
+      .replace(/2Spell/g, "2nd Spell") // Correct common OCR misreads
+      .replace(/1Spell/g, "1st Spell")
+      .trim();
+  }
+
+  /**
    * Triple-Pass OCR: AI Vision (for tables) with Tesseract Safety Net (for size/reliability)
    */
   async performOcr(buffer) {
@@ -75,7 +90,6 @@ export class PdfService {
 
     if (images.length === 0) return "";
 
-    // Initialize Tesseract as the 'Safety Net'
     const worker = await createWorker('eng');
 
     try {
@@ -86,22 +100,21 @@ export class PdfService {
           let transcription = null;
           const base64Image = Buffer.from(image.bytes).toString('base64');
           
-          // PASS 2: Attempt High-Accuracy AI Vision
-          if (base64Image.length < 5000000) { // < 5MB (Safe threshold for Vision NIM)
+          if (base64Image.length < 5000000) {
             transcription = await aiService.performVisionOcr(base64Image, image.mimeType);
-          } else {
-            console.log("⚠️ Image too large for Cloud Vision. Skipping to Safety Net...");
           }
 
-          // PASS 3: Tesseract Safety Net (Legacy Fallback)
           if (!transcription || transcription.includes("[Error")) {
             console.log("🛡️ Cloud extraction failed/skipped. Running local Tesseract...");
             const result = await worker.recognize(Buffer.from(image.bytes));
             transcription = result.data.text;
           }
 
+          // 🧼 New Preprocessing Layer
+          const cleanedText = this.cleanOcrNoise(transcription);
+
           const pageRef = i < pageCount ? i + 1 : 'Global';
-          fullText += `\n\n[PAGE_MARKER_${pageRef}]\n\n` + transcription;
+          fullText += `\n\n[PAGE_MARKER_${pageRef}]\n\n` + cleanedText;
       }
     } finally {
       await worker.terminate();
