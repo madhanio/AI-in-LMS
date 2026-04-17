@@ -119,7 +119,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             icon: const Icon(Icons.search, color: Colors.black, size: 24),
             onPressed: () {},
           ),
-            child: Consumer<AuthProvider>(
+          Consumer<AuthProvider>(
               builder: (context, auth, _) => Padding(
                 padding: const EdgeInsets.only(right: 16.0),
                 child: InkWell(

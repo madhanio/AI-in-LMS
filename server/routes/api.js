@@ -148,20 +148,36 @@ router.post('/query', async (req, res) => {
         const keywords = queryVal.toLowerCase().split(/\s+/).filter(w => w.length > 3);
         const scoredChunks = allChunks.map(c => {
           const semanticScore = cosineSimilarity(queryEmbedding, c.embedding);
-          const textLower = c.text.toLowerCase();
+          const isCalendar = c.subject === '__CALENDAR__';
+          
           let keywordMatches = 0;
+          const textLower = c.text.toLowerCase();
           keywords.forEach(kw => { if (textLower.includes(kw)) keywordMatches += 0.05; });
-          return { ...c, score: semanticScore + Math.min(keywordMatches, 0.15) };
+
+          // Calendar chunks get a "Safety Boost" to ensure schedule awareness
+          const finalScore = semanticScore + Math.min(keywordMatches, 0.15) + (isCalendar ? 0.12 : 0);
+          return { ...c, score: finalScore };
         });
 
         scoredChunks.sort((a, b) => b.score - a.score);
-        const thresholdChunks = scoredChunks.filter(c => c.score > 0.4);
+        
+        // Lower threshold for Global Calendar (0.3 vs 0.42) to ensure it's captured
+        const thresholdChunks = scoredChunks.filter(c => {
+           if (c.subject === '__CALENDAR__') return c.score > 0.3;
+           return c.score > 0.42; 
+        });
 
         if (thresholdChunks.length > 0) {
-          const topK = question.split(' ').length > 25 ? 8 : 4;
+          console.log(`✅ Found ${thresholdChunks.length} chunks (Top Score: ${thresholdChunks[0].score.toFixed(2)})`);
+          const topK = question.split(' ').length > 25 ? 8 : 5;
           const topChunks = thresholdChunks.slice(0, topK);
+          
           finalContext = topChunks.map(c => {
-             const meta = [c.file_name, c.page_number ? `P${c.page_number}` : ''].filter(Boolean);
+             const meta = [
+               c.file_name, 
+               c.subject === '__CALENDAR__' ? '(Academic Calendar)' : '',
+               c.page_number ? `P${c.page_number}` : ''
+             ].filter(Boolean);
              return `${meta.length ? '[' + meta.join(' ') + '] ' : ''}${c.text}`;
           }).join('\n---\n');
           
