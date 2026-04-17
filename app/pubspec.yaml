@@ -41,6 +41,7 @@ dependencies:
   google_fonts: ^8.0.2
   provider: ^6.1.5+1
   shared_preferences: ^2.2.2
+  supabase_flutter: ^2.12.4
 
 dev_dependencies:
   flutter_test:
@@ -52,6 +53,8 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.7
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -63,6 +66,10 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - assets/moodle.png
+    - assets/moodle_padded_splash.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -94,3 +101,17 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/moodle.png"
+
+flutter_native_splash:
+  color: "#ffffff"
+  image: "assets/moodle_padded_splash.png"
+  android_12:
+    image: "assets/moodle_padded_splash.png"
+    color: "#ffffff"
+  android: true
+  ios: true

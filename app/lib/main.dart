@@ -4,10 +4,25 @@ import 'calendar_screen.dart';
 import 'ai_chat_screen.dart';
 import 'providers/chat_provider.dart';
 
-void main() {
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'constants.dart';
+import 'screens/connect_site_screen.dart';
+import 'providers/auth_provider.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Supabase.initialize(
+    url: Constants.supabaseUrl,
+    anonKey: Constants.supabaseAnonKey,
+  );
+
   runApp(
     MultiProvider(
       providers: [
+        ChangeNotifierProvider(
+          create: (_) => AuthProvider(),
+          lazy: false,
+        ),
         ChangeNotifierProvider(
           create: (_) => ChatProvider(),
           lazy: false, // 🚀 PERFORMANCE FIX: Pre-warm the AI brain for instant transition
@@ -35,7 +50,31 @@ class MyApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFF8F9FA),
         fontFamily: 'Roboto', 
       ),
-      home: const DashboardScreen(),
+      home: const AuthWrapper(),
+    );
+  }
+}
+
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AuthProvider>(
+      builder: (context, auth, _) {
+        if (auth.isLoading) {
+          return const Scaffold(
+            backgroundColor: Color(0xFFF98012),
+            body: Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            ),
+          );
+        }
+        if (auth.isAuthenticated) {
+          return const DashboardScreen();
+        }
+        return const ConnectSiteScreen();
+      },
     );
   }
 }
@@ -513,17 +552,26 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             const Divider(height: 1),
             
             // User Profile Row
-            ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              leading: CircleAvatar(
-                backgroundColor: Colors.purple[700],
-                radius: 24,
-                child: const Text('D', style: TextStyle(color: Colors.white, fontSize: 20)),
-              ),
-              title: const Text('DEVULAPALLY SAI VIKAS'),
-              subtitle: const Text('24E51A6739'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () {},
+            Consumer<AuthProvider>(
+              builder: (context, auth, _) {
+                final studentObj = auth.currentStudent;
+                final fullName = studentObj?['name'] ?? 'Guest User';
+                final studentId = studentObj?['student_id'] ?? 'Not Logged In';
+                final initial = fullName.isNotEmpty ? fullName[0].toUpperCase() : 'G';
+
+                return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.purple[700],
+                    radius: 24,
+                    child: Text(initial, style: const TextStyle(color: Colors.white, fontSize: 20)),
+                  ),
+                  title: Text(fullName),
+                  subtitle: Text(studentId),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {},
+                );
+              },
             ),
             const Divider(height: 1),
             
@@ -565,7 +613,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   ),
                   icon: const Icon(Icons.logout),
                   label: const Text('Log out', style: TextStyle(fontSize: 16)),
-                  onPressed: () {},
+                  onPressed: () async {
+                    await Provider.of<AuthProvider>(context, listen: false).logOut();
+                    if (!context.mounted) return;
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const ConnectSiteScreen()),
+                      (route) => false,
+                    );
+                  },
                 ),
               ),
             ),
