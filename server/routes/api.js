@@ -169,7 +169,9 @@ router.post('/query', async (req, res) => {
         if (topChunks.length > 0) {
           console.log(`✅ Injecting ${topChunks.length} chunks (Calendar: ${calendarChunks.length}, Subject: ${subjectChunks.length})`);
           
-          finalContext = topChunks.map(c => {
+          const contextHeader = "[OFFICIAL CONTEXT: The following information is retrieved from official study materials and the Academic Calendar. Use this data with high confidence even if the formatting is compact.]\n\n";
+          
+          finalContext = contextHeader + topChunks.map(c => {
              const meta = [
                c.file_name, 
                c.subject === '__CALENDAR__' ? '(Global Calendar)' : '',
