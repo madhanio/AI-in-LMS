@@ -209,8 +209,6 @@ export class PdfService {
     return chunks;
   }
 
-  }
-
   /**
    * Converts all pages of a PDF buffer into an array of image buffers (Base64 ready)
    */
