@@ -76,13 +76,25 @@ router.post('/upload', authenticateAdmin, upload.single('pdfFile'), async (req, 
     // Check if filename already exists in this subject
     const subjectFiles = await storageService.getFiles();
     const currentFiles = subjectFiles[subject] || [];
-    if (currentFiles.some(f => f.fileName === fileName)) {
+    
+    // 🔥 CALENDAR SYNC LOGIC: If it's a calendar, clear old one first to avoid "already processed" skips
+    if (subject === '__CALENDAR__') {
+       for (const oldFile of currentFiles) {
+         await storageService.deleteFile(subject, oldFile.id);
+       }
+    } else if (currentFiles.some(f => f.fileName === fileName)) {
        return res.json({ message: "File already processed.", skip: true });
     }
 
     console.log(`Processing ${fileName} for ${subject}...`);
     const text = await pdfService.extractText(req.file.buffer);
     const chunks = pdfService.chunkText(text);
+    
+    if (chunks.length === 0) {
+       console.log("⚠️ No content extracted from PDF (even with OCR).");
+    } else {
+       console.log(`✅ Extracted ${chunks.length} chunks from ${fileName}.`);
+    }
     
     const texts = chunks.map(c => c.text);
     const embeddings = await aiService.getEmbeddings(texts, "passage");

@@ -1,15 +1,16 @@
 import pdfParse from "pdf-parse";
+import { PDFDocument } from "pdf-lib";
+import { createWorker } from "tesseract.js";
 
 export class PdfService {
   /**
    * Extracts text from PDF buffer and injects page markers.
+   * Now includes AI OCR fallback for scanned documents!
    */
   async extractText(buffer) {
-    function render_page(pageData) {
-      let render_options = {
-        normalizeWhitespace: false,
-        disableCombineTextItems: false
-      };
+    // 1. Try standard extraction first
+    const render_page = (pageData) => {
+      let render_options = { normalizeWhitespace: false, disableCombineTextItems: false };
       return pageData.getTextContent(render_options).then(function(textContent) {
         let text = '';
         let lastY = null;
@@ -23,10 +24,63 @@ export class PdfService {
         }
         return `\n\n[PAGE_MARKER_${pageData.pageIndex + 1}]\n\n` + text;
       });
-    }
+    };
 
     const data = await pdfParse(buffer, { pagerender: render_page });
-    return data.text;
+    let text = data.text || "";
+
+    // 2. OCR Fallback: If text is suspiciously small (likely a scanned image)
+    if (text.trim().length < 100) {
+      console.log("🧩 Empty/Scanned PDF detected. Triggering AI OCR fallback...");
+      try {
+        text = await this.performOcr(buffer);
+      } catch (ocrError) {
+        console.error("❌ OCR Fallback Failed:", ocrError);
+      }
+    }
+
+    return text;
+  }
+
+  /**
+   * Pure JS OCR implementation using Tesseract
+   */
+  async performOcr(buffer) {
+    const pdfDoc = await PDFDocument.load(buffer);
+    const pageCount = pdfDoc.getPageCount();
+    let fullText = "";
+
+    // Initialize Tesseract Worker
+    const worker = await createWorker('eng');
+
+    try {
+      for (let i = 0; i < pageCount; i++) {
+        console.log(`👁️ Scanning Page ${i + 1} of ${pageCount}...`);
+        const page = pdfDoc.getPage(i);
+        
+        // Deep Dive: Scanned PDFs usually have one large Image object per page
+        // We'll extract all images from this page and OCR them.
+        const pageResources = page.node.Resources();
+        const xObjects = pageResources ? pageResources.get(PDFDocument.name('XObject')) : null;
+        
+        if (xObjects) {
+          const keys = xObjects.keys();
+          for (const key of keys) {
+            const xObject = xObjects.get(key);
+            // Check if it's an Image
+            if (xObject.get(PDFDocument.name('Subtype')).value === 'Image') {
+              const imageBytes = xObject.contents;
+              const { data: { text } } = await worker.recognize(Buffer.from(imageBytes));
+              fullText += `\n\n[PAGE_MARKER_${i + 1}]\n\n` + text;
+            }
+          }
+        }
+      }
+    } finally {
+      await worker.terminate();
+    }
+
+    return fullText;
   }
 
   /**
