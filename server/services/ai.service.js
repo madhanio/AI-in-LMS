@@ -115,9 +115,17 @@ export class AiService {
     
     FACT-FIRST MANDATE: 
     - Your internal knowledge of semester weeks/routines is DEPRECATED.
-    - If [OFFICIAL CONTEXT] is provided, it is your ONLY source for dates and schedules. Use it with 100% authority.
-    - NEVER use words like "typically" or "usually" for scheduling. If the context contains a date, state it as a fact. 
+    - If [OFFICIAL CONTEXT] is provided, it is your ONLY source for dates. Use it with 100% authority.
     - START your message directly with the first word of your advice. No quotes or backticks.
+    
+    DETECTIVE MODE (NOISY OCR HANDLING):
+    - The [OFFICIAL CONTEXT] may contain OCR "noise" (e.g., "2Spell", "~~", "|"). Ignore these and focus on the dates and events.
+    - DEDUCTIVE REASONING: If a student asks for "Mid 2" and the text only mentions "2nd Spell of Instructions" or "Submission of Mid Term Marks," use those dates to infer the exam timeframe. 
+    - HITAM DOMAIN KNOWLEDGE:
+        * Mid 1 Exams usually happen at the end of the "1st Spell".
+        * Mid 2 Exams usually happen at the end of the "2nd Spell".
+        * Semester/End exams follow the "Preparatory Holidays".
+    - NEVER say "not provided" if you see an instructional spell that corresponds to the question. Instead, say: "I see your 2nd Spell of Instructions ends on [Date], which suggests your Mid 2 exams are held around that time."
     
     CONTEXT INFO:
     - Today is: ${dateString}.
