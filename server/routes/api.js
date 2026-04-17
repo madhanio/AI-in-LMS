@@ -88,6 +88,28 @@ router.post('/upload', authenticateAdmin, upload.single('pdfFile'), async (req, 
 
     console.log(`Processing ${fileName} for ${subject}...`);
     const text = await pdfService.extractText(req.file.buffer);
+    
+    // 🔥 NEW: Structured Data Lane Classification
+    const contentType = await aiService.classifyContent(text);
+    console.log(`Content classification for ${fileName}: ${contentType}`);
+
+    if (contentType === 'TABULAR' || subject === '__CALENDAR__') {
+       console.log("➡️ Routing to Structured Data Lane (Calendar/Table detected)...");
+       const tables = await pdfService.extractTables(req.file.buffer);
+       
+       if (tables.length > 0) {
+         const events = await aiService.parseTableToEvents(tables, fileName);
+         await storageService.saveCalendarEvents(events);
+         return res.json({ 
+           message: "PDF processed via Structured Data Lane", 
+           type: "tabular",
+           eventsExtracted: events.length 
+         });
+       } else {
+         console.log("⚠️ Tabular classification but no tables found. Falling back to RAG.");
+       }
+    }
+
     const chunks = pdfService.chunkText(text);
     
     if (chunks.length === 0) {
@@ -134,13 +156,42 @@ router.post('/query', async (req, res) => {
     console.log(`Intent detected: ${intent}`);
 
     if (isAcademic) {
-      let queryVal = question;
-      if (question.trim().split(/\s+/).length >= 3) {
-        console.log(`Expanding academic query...`);
-        queryVal = await aiService.expandQuery(question);
+      // 📅 NEW: Structured Lane Router
+      const calendarKeywords = {
+        events: ['exam', 'mid term', 'holiday', 'semester', 'timetable', 'schedule', 'break', 'commencement', 'odd semester', 'even semester'],
+        dates:  ['when is', 'what date', 'how many days', 'remaining', 'upcoming', 'next', 'left', 'how long', 'already over', 'passed'],
+        deadlines: ['submission', 'submit', 'deadline', 'last date', 'on or before', 'marks entry'],
+        exams: ['practical', 'supply', 'supplementary', 'SEE', 'end semester']
+      };
+
+      const isCalendarQuery = Object.values(calendarKeywords)
+        .flat()
+        .some(k => question.toLowerCase().includes(k));
+
+      if (isCalendarQuery) {
+        console.log("📅 Calendar keyword detected. Routing to Structured Lane...");
+        const events = await storageService.searchCalendarEvents(question);
+        
+        if (events.length > 0) {
+          finalContext = "[OFFICIAL CALENDAR DATA]\n" + events.map(e => (
+            `- ${e.event_name} (Semester: ${e.semester}): ${e.date_raw} ${e.date_is_approximate ? '[APPROXIMATE]' : ''}`
+          )).join('\n');
+          
+          console.log(`✅ Successfully routed to SQL path. Found ${events.length} events.`);
+        } else {
+          console.log("⚠️ No specific calendar events found in SQL. Falling back to vector search.");
+          // Fall through to existing academic search
+        }
       }
-      
-      const queryEmbedding = await aiService.getEmbedding(queryVal, "query");
+
+      if (finalContext === "No specific lecture notes found for this query.") {
+        let queryVal = question;
+        if (question.trim().split(/\s+/).length >= 3) {
+          console.log(`Expanding academic query...`);
+          queryVal = await aiService.expandQuery(question);
+        }
+        
+        const queryEmbedding = await aiService.getEmbedding(queryVal, "query");
       const searchSubjects = subject ? [subject, '__CALENDAR__'] : ['__CALENDAR__'];
       const allChunks = await storageService.getAllChunks(searchSubjects);
       

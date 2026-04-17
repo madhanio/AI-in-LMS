@@ -190,6 +190,57 @@ export class StorageService {
       console.error("Failed to log query analytics:", error);
     }
   }
+
+  /**
+   * Save structured calendar events
+   */
+  async saveCalendarEvents(events) {
+    if (!events || events.length === 0) return true;
+    
+    const { error } = await supabase
+      .from('calendar_events')
+      .insert(events);
+      
+    if (error) {
+      console.error("Supabase Calendar Insert Error:", error);
+      throw error;
+    }
+    return true;
+  }
+
+  /**
+   * Query calendar events using keywords
+   */
+  async searchCalendarEvents(question) {
+    // 💡 Keyword-based SQL lookup as requested
+    const words = question.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+    
+    let query = supabase.from('calendar_events').select('*');
+    
+    // Simplistic keyword matching across columns
+    // In a real production app, we'd use Postgres Full Text Search (rpc call)
+    // but for this lane, we'll fetch recent relevant events.
+    if (words.length > 0) {
+      // Supabase JS doesn't support complex OR filters easily without RPC, 
+      // but we can look for any events where event_name or semester match major words
+      const { data, error } = await query
+        .or(`event_name.ilike.%${words[0]}%,semester.ilike.%${words[0]}%`)
+        .order('date_from', { ascending: true })
+        .limit(10);
+        
+      if (error) {
+        console.error("Supabase Calendar Search Error:", error);
+        return [];
+      }
+      return data;
+    }
+
+    const { data: recent, error: recentError } = await query
+      .order('created_at', { ascending: false })
+      .limit(10);
+      
+    return recent || [];
+  }
 }
 
 export const storageService = new StorageService();

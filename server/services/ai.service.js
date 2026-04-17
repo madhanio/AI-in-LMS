@@ -123,6 +123,9 @@ export class AiService {
     - STRIKE RULE: If a date is not in the context, simply say: "I can see the semester timeframe, but the exact date for [Event] isn't clearly in this section."
     - NEVER calculate weeks or guess dates based on 'typical' schedules. Helpful but 100% grounded.
     
+    HONESTY RULE (APPROXIMATE DATES):
+    - If the provided calendar context indicates 'date_is_approximate: true' or says a date is 'approximate', YOU MUST inform the student: "This is scheduled for [Original Date] — exact dates aren't confirmed yet."
+    
     DETECTIVE MODE (PRECISION):
     - Use "Instruction Spells" to give students a 'window' of when events happen. 
     - If the OCR text is fragmented, look at the row headers to bridge the data.
@@ -188,6 +191,93 @@ export class AiService {
       return data.choices[0]?.message?.content || "";
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Classifies if the extracted text is primarily tabular (Calendar/Timetable)
+   */
+  async classifyContent(text) {
+    try {
+      const response = await fetch(`${BASE_URL}/chat/completions`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${NVIDIA_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "meta/llama-3.1-8b-instruct",
+          messages: [
+            {
+              role: "system",
+              content: "Classify if the text is an ACADEMIC CALENDAR, TIMETABLE, or SCHEDULE. Output only 'TABULAR' or 'TEXT'."
+            },
+            { role: "user", content: text.slice(0, 3000) } // Sample the text
+          ],
+          temperature: 0.1,
+          max_tokens: 10
+        })
+      });
+      const data = await response.json();
+      const result = (data.choices[0]?.message?.content || "TEXT").toUpperCase();
+      return result.includes("TABULAR") ? "TABULAR" : "TEXT";
+    } catch (e) {
+      console.error("Classification Error:", e);
+      return "TEXT";
+    }
+  }
+
+  /**
+   * Converts raw tables into structured JSON events
+   */
+  async parseTableToEvents(extractedTables, fileName) {
+    try {
+      const tableData = JSON.stringify(extractedTables);
+      const response = await fetch(`${BASE_URL}/chat/completions`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${NVIDIA_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "meta/llama-3.1-8b-instruct",
+          messages: [
+            {
+              role: "system",
+              content: `Convert the following extracted table data into a structured JSON array of academic events.
+              
+              JSON SCHEMA:
+              {
+                "events": [
+                  {
+                    "semester": "string (e.g., I-I, II-II, or Sem 1)",
+                    "event_name": "string (e.g., Mid Exams, Registration)",
+                    "date_from": "string (ISO format YYYY-MM-DD or null)",
+                    "date_to": "string (ISO format YYYY-MM-DD or null)",
+                    "date_raw": "string (original text from table)",
+                    "date_is_approximate": boolean
+                  }
+                ]
+              }
+              
+              RULES:
+              1. If a date is specific (e.g., 22.09.2025), parse to ISO.
+              2. If a date is vague (e.g., 3rd Week of April), set date_from/to to null and date_is_approximate to true.
+              3. Always keep the original text in date_raw.
+              4. Output ONLY the JSON object.`
+            },
+            { role: "user", content: `SOURCE FILE: ${fileName}\n\nDATA: ${tableData}` }
+          ],
+          temperature: 0.1,
+          response_format: { type: "json_object" }
+        })
+      });
+      
+      const data = await response.json();
+      const content = data.choices[0]?.message?.content;
+      const parsed = JSON.parse(content);
+      
+      return (parsed.events || []).map(event => ({
+        ...event,
+        source_file: fileName
+      }));
+    } catch (e) {
+      console.error("Structured Parsing Error:", e);
+      return [];
     }
   }
 }

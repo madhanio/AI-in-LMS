@@ -2,6 +2,10 @@ import pdfParse from "pdf-parse";
 import { PDFDocument, PDFName, PDFDict, PDFRawStream } from "pdf-lib";
 import { createWorker } from "tesseract.js";
 import { aiService } from "./ai.service.js";
+import { spawnSync } from "child_process";
+import fs from "fs";
+import path from "path";
+import os from "os";
 
 export class PdfService {
   /**
@@ -197,6 +201,54 @@ export class PdfService {
     }
     
     return chunks;
+  }
+
+  /**
+   * Extracts tables from PDF buffer using pdfplumber (via Python helper)
+   */
+  async extractTables(buffer) {
+    const tempFilePath = path.join(os.tmpdir(), `temp_${Date.now()}.pdf`);
+    
+    try {
+      // Write buffer to temp file
+      fs.writeFileSync(tempFilePath, buffer);
+      
+      const scriptPath = path.resolve("utils", "table_extractor.py");
+      console.log(`🎬 Running table extraction via Python: ${scriptPath}`);
+      
+      const result = spawnSync("python", [scriptPath, tempFilePath], { encoding: "utf8" });
+      
+      if (result.error) {
+        console.error("❌ Python Execution Error:", result.error);
+        return [];
+      }
+
+      if (result.status !== 0) {
+        console.error("❌ Python Helper Failed:", result.stderr);
+        return [];
+      }
+
+      try {
+        const tables = JSON.parse(result.stdout);
+        if (tables.error) {
+          console.error("❌ Extraction Script Error:", tables.error);
+          return [];
+        }
+        return tables;
+      } catch (parseError) {
+        console.error("❌ Error parsing extraction JSON:", parseError);
+        console.log("Raw Output:", result.stdout);
+        return [];
+      }
+    } catch (error) {
+      console.error("❌ Table Extraction Failed:", error);
+      return [];
+    } finally {
+      // Cleanup
+      if (fs.existsSync(tempFilePath)) {
+        fs.unlinkSync(tempFilePath);
+      }
+    }
   }
 }
 
