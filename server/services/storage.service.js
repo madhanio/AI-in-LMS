@@ -212,21 +212,22 @@ export class StorageService {
    * Query calendar events using keywords
    */
   async searchCalendarEvents(question) {
-    // 💡 Keyword-based SQL lookup as requested
+    // 💡 TIER 3: ROBUST SQL LOOKUP
     const words = question.toLowerCase().split(/\s+/).filter(w => w.length > 3);
     
     let query = supabase.from('calendar_events').select('*');
     
-    // Simplistic keyword matching across columns
-    // In a real production app, we'd use Postgres Full Text Search (rpc call)
-    // but for this lane, we'll fetch recent relevant events.
     if (words.length > 0) {
-      // Supabase JS doesn't support complex OR filters easily without RPC, 
-      // but we can look for any events where event_name or semester match major words
+      // Build a multi-keyword OR filter for the top relevant terms
+      // Looking for matches in event_name or semester
+      const filterConditions = words.slice(0, 3).map(w => 
+        `event_name.ilike.%${w}%,semester.ilike.%${w}%`
+      ).join(',');
+
       const { data, error } = await query
-        .or(`event_name.ilike.%${words[0]}%,semester.ilike.%${words[0]}%`)
+        .or(filterConditions)
         .order('date_from', { ascending: true })
-        .limit(10);
+        .limit(15);
         
       if (error) {
         console.error("Supabase Calendar Search Error:", error);
@@ -235,11 +236,13 @@ export class StorageService {
       return data;
     }
 
-    const { data: recent, error: recentError } = await query
-      .order('created_at', { ascending: false })
+    // Default: Return upcoming events if no keywords
+    const { data: upcoming, error: upcomingError } = await query
+      .gte('date_from', new Date().toISOString().split('T')[0])
+      .order('date_from', { ascending: true })
       .limit(10);
       
-    return recent || [];
+    return upcoming || [];
   }
 }
 

@@ -5,6 +5,9 @@ const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY;
 const NVIDIA_VISION_KEY = process.env.NVIDIA_VISION_KEY || NVIDIA_API_KEY;
 const BASE_URL = "https://integrate.api.nvidia.com/v1";
 
+// 🧠 TIER 1: SEMANTIC CACHE (Local In-Memory)
+const semanticCache = new Map();
+
 export class AiService {
   async getEmbeddings(texts, inputType = "passage") {
     const BATCH_SIZE = 50;
@@ -66,6 +69,54 @@ export class AiService {
     }
   }
 
+  /**
+   * TIER 1: SEMANTIC CACHE CHECK
+   * Prevents LLM calls for identical frequent questions.
+   */
+  async checkCache(question) {
+    const q = question.toLowerCase().trim();
+    return semanticCache.get(q) || null;
+  }
+
+  async saveToCache(question, answer) {
+    const q = question.toLowerCase().trim();
+    if (semanticCache.size > 500) semanticCache.clear(); // Basic rotation
+    semanticCache.set(q, answer);
+  }
+
+  /**
+   * TIER 2: THE TRAFFIC COP (LLM GATEKEEPER)
+   * Strictly determines if the query is schedule/calendar related.
+   */
+  async isCalendarRelevance(question) {
+    try {
+      const response = await fetch(`${BASE_URL}/chat/completions`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${NVIDIA_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "meta/llama-3.1-8b-instruct",
+          messages: [
+            {
+              role: "system",
+              content: "You are a router. The user is asking about an academic schedule. Is the user asking for dates, deadlines, semesters, or exam schedules? Answer ONLY with a JSON object: {\"is_calendar\": true} or {\"is_calendar\": false}. Differentiate between 'exam' (test) and 'examine' (inspect)."
+            },
+            { role: "user", content: question }
+          ],
+          temperature: 0.1,
+          response_format: { type: "json_object" }
+        })
+      });
+
+      if (!response.ok) return false;
+      const data = await response.json();
+      const content = JSON.parse(data.choices[0]?.message?.content || "{\"is_calendar\": false}");
+      return content.is_calendar === true;
+    } catch (e) {
+      console.error("Traffic Cop Error:", e.message);
+      return false;
+    }
+  }
+
   async getIntent(question) {
     try {
       const response = await fetch(`${BASE_URL}/chat/completions`, {
@@ -79,18 +130,20 @@ export class AiService {
           messages: [
             {
               role: "system",
-              content: `Classify user intent into: 'CASUAL', 'STUDY_QUICK', or 'STUDY_DEEP'.`
+              content: "Classify user intent into: 'CASUAL', 'STUDY_QUICK', 'STUDY_DEEP', or 'CALENDAR_QUERY'."
             },
             { role: "user", content: question }
           ],
           temperature: 0.1,
-          max_tokens: 10
+          max_tokens: 15
         })
       });
       const data = await response.json();
-      const intent = (data.choices[0]?.message?.content || 'CASUAL').toUpperCase();
-      if (intent.includes('DEEP')) return 'STUDY_DEEP';
-      if (intent.includes('QUICK')) return 'STUDY_QUICK';
+      const content = (data.choices[0]?.message?.content || 'CASUAL').toUpperCase();
+      
+      if (content.includes('CALENDAR')) return 'CALENDAR_QUERY';
+      if (content.includes('DEEP')) return 'STUDY_DEEP';
+      if (content.includes('QUICK')) return 'STUDY_QUICK';
       return 'CASUAL';
     } catch {
       return 'STUDY_QUICK';

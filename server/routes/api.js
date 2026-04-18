@@ -170,43 +170,39 @@ router.post('/query', async (req, res) => {
       return res.status(400).json({ error: "Question is required" });
     }
 
+    // 🧠 TIER 1: SEMANTIC CACHE (Local Memory)
+    const cachedAnswer = await aiService.checkCache(question);
+    if (cachedAnswer) {
+       console.log("⚡ Serving from Cache...");
+       res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+       res.setHeader('Cache-Control', 'no-cache');
+       res.flushHeaders();
+       res.write(cachedAnswer);
+       return res.end();
+    }
+
     console.log(`Querying ${subject || 'global'} for: ${question}`);
 
-    // 🔥 TRIPLE-PATH INTENT GOVERNOR
-    const intent = await aiService.getIntent(question);
-    const isAcademic = intent.startsWith('STUDY'); 
-    console.log(`Intent detected: ${intent}`);
+    // 🔥 TIER 2: THE TRAFFIC COP (LLM Gatekeeper)
+    const isCalendar = await aiService.isCalendarRelevance(question);
+    console.log(`Traffic Cop Result (is_calendar): ${isCalendar}`);
 
-    if (isAcademic) {
-      // 📅 NEW: Structured Lane Router
-      const calendarKeywords = {
-        events: ['exam', 'mid term', 'holiday', 'semester', 'timetable', 'schedule', 'break', 'commencement', 'odd semester', 'even semester'],
-        dates:  ['when is', 'what date', 'how many days', 'remaining', 'upcoming', 'next', 'left', 'how long', 'already over', 'passed'],
-        deadlines: ['submission', 'submit', 'deadline', 'last date', 'on or before', 'marks entry'],
-        exams: ['practical', 'supply', 'supplementary', 'SEE', 'end semester']
-      };
-
-      const isCalendarQuery = Object.values(calendarKeywords)
-        .flat()
-        .some(k => question.toLowerCase().includes(k));
-
-      if (isCalendarQuery) {
-        console.log("📅 Calendar keyword detected. Routing to Structured Lane...");
+    if (isCalendar) {
+        console.log("📅 Routing to Structured Calendar Lane (SQL)...");
         const events = await storageService.searchCalendarEvents(question);
         
         if (events.length > 0) {
           finalContext = "[OFFICIAL CALENDAR DATA]\n" + events.map(e => (
             `- ${e.event_name} (Semester: ${e.semester}): ${e.date_raw} ${e.date_is_approximate ? '[APPROXIMATE]' : ''}`
           )).join('\n');
-          
-          console.log(`✅ Successfully routed to SQL path. Found ${events.length} events.`);
+          console.log(`✅ SQL Path success. Found ${events.length} events.`);
         } else {
-          console.log("⚠️ No specific calendar events found in SQL. Falling back to vector search.");
-          // Fall through to existing academic search
+          console.log("⚠️ SQL empty for calendar query. Falling back to vector search.");
         }
-      }
+    }
 
-      if (finalContext === "No specific lecture notes found for this query.") {
+    // TIER 3: Standard Academic Search (Only if context is still empty or not purely a calendar query)
+    if (finalContext.includes("No specific lecture notes")) {
         let queryVal = question;
         if (question.trim().split(/\s+/).length >= 3) {
           console.log(`Expanding academic query...`);
@@ -214,54 +210,35 @@ router.post('/query', async (req, res) => {
         }
         
         const queryEmbedding = await aiService.getEmbedding(queryVal, "query");
-      const searchSubjects = subject ? [subject, '__CALENDAR__'] : ['__CALENDAR__'];
-      const allChunks = await storageService.getAllChunks(searchSubjects);
-      
-      if (allChunks.length > 0) {
-        const keywords = queryVal.toLowerCase().split(/\s+/).filter(w => w.length > 3);
-        const scoredChunks = allChunks.map(c => {
-          const semanticScore = cosineSimilarity(queryEmbedding, c.embedding);
-          const isCalendar = c.subject === '__CALENDAR__';
-          
-          let keywordMatches = 0;
-          const textLower = c.text.toLowerCase();
-          keywords.forEach(kw => { if (textLower.includes(kw)) keywordMatches += 0.05; });
-
-          const finalScore = semanticScore + Math.min(keywordMatches, 0.15) + (isCalendar ? 0.12 : 0);
-          return { ...c, score: finalScore };
-        });
-
-        scoredChunks.sort((a, b) => b.score - a.score);
+        const searchSubjects = subject ? [subject, '__CALENDAR__'] : ['__CALENDAR__'];
+        const allChunks = await storageService.getAllChunks(searchSubjects);
         
-        // 🔥 GUARANTEED VISIBILITY: Always include the top 2 calendar chunks if they exist
-        const calendarChunks = scoredChunks.filter(c => c.subject === '__CALENDAR__').slice(0, 2);
-        const subjectChunks = scoredChunks.filter(c => c.subject !== '__CALENDAR__' && c.score > 0.42).slice(0, 4);
-        
-        const topChunks = [...calendarChunks, ...subjectChunks];
+        if (allChunks.length > 0) {
+          const keywords = queryVal.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+          const scoredChunks = allChunks.map(c => {
+            const semanticScore = cosineSimilarity(queryEmbedding, c.embedding);
+            const isCalendarChunk = c.subject === '__CALENDAR__';
+            
+            let keywordMatches = 0;
+            const textLower = c.text.toLowerCase();
+            keywords.forEach(kw => { if (textLower.includes(kw)) keywordMatches += 0.05; });
 
-        if (topChunks.length > 0) {
-          console.log(`✅ Injecting ${topChunks.length} chunks (Calendar: ${calendarChunks.length}, Subject: ${subjectChunks.length})`);
-          
-          const contextHeader = "[OFFICIAL CONTEXT: The following information is retrieved from official study materials and the Academic Calendar. Use this data with high confidence even if the formatting is compact.]\n\n";
-          
-          finalContext = contextHeader + topChunks.map(c => {
-             const meta = [
-               c.file_name, 
-               c.subject === '__CALENDAR__' ? '(Global Calendar)' : '',
-               c.page_number ? `P${c.page_number}` : ''
-             ].filter(Boolean);
-             return `${meta.length ? '[' + meta.join(' ') + '] ' : ''}${c.text}`;
-          }).join('\n---\n');
-          
-          const avgSim = topChunks.reduce((acc, c) => acc + c.score, 0) / topChunks.length;
-          storageService.logQuery(question, topChunks.length, avgSim, Date.now() - startTime, subject);
+            const finalScore = semanticScore + Math.min(keywordMatches, 0.15) + (isCalendarChunk ? 0.12 : 0);
+            return { ...c, score: finalScore };
+          });
+
+          scoredChunks.sort((a, b) => b.score - a.score);
+          const topChunks = scoredChunks.filter(c => c.score > 0.42).slice(0, 5);
+
+          if (topChunks.length > 0) {
+            console.log(`✅ Injecting ${topChunks.length} chunks via Vector Search.`);
+            finalContext = "[RELEVANT CONTEXT]\n" + topChunks.map(c => `[${c.file_name}] ${c.text}`).join('\n---\n');
+          }
         }
-      }
     }
-  } else {
-    console.log("Casual/Meta query detected. Skipping PDF search.");
-  }
 
+    // Get the intent for persona/depth scaling
+    const intent = await aiService.getIntent(question);
     const stream = await aiService.getChatAnswer(question, finalContext, history, subject || 'General', intent, rollNumber);
     
     // Set headers for streaming (Critical for Render/Proxy stability)
@@ -274,11 +251,18 @@ router.post('/query', async (req, res) => {
     res.write(' ');
 
     const reader = stream.getReader();
+    let fullResponse = "";
     try {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
+        const text = new TextDecoder().decode(value);
+        fullResponse += text;
         res.write(value);
+      }
+      // Save to Tier 1 Cache for future hits
+      if (fullResponse.length > 0) {
+        aiService.saveToCache(question, fullResponse);
       }
     } catch (err) {
       console.error("Stream interrupted", err);
