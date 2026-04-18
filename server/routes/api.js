@@ -229,10 +229,6 @@ router.post('/query', async (req, res) => {
       return res.status(400).json({ error: "Question is required" });
     }
 
-       res.write(cachedAnswer);
-       return res.end();
-    }
-
     console.log(`Querying ${subject || 'global'} for: ${question}`);
 
     // 🔥 TIER 2: THE TRAFFIC COP (LLM Gatekeeper)
