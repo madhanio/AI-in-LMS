@@ -171,7 +171,10 @@ export class AiService {
   async getChatAnswer(question, contextText, history = [], subject = "General Academics", intent = "STUDY_QUICK", rollNumber = "") {
     const isDeep = intent === "STUDY_DEEP";
     const isCasual = intent === "CASUAL";
-    const modelToUse = isDeep ? "nvidia/nemotron-3-super-120b-a12b" : "meta/llama-3.1-8b-instruct";
+    // 🔧 MODEL SWITCH: Change this line for Demo Day
+    // Daily use:  "meta/llama-3.1-8b-instruct"
+    // Demo Day:   "meta/llama-3.1-70b-instruct"
+    const modelToUse = "meta/llama-3.1-8b-instruct";
 
     const now = new Date();
     const dateString = now.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
