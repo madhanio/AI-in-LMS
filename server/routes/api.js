@@ -160,6 +160,37 @@ router.post('/upload', authenticateAdmin, upload.single('pdfFile'), async (req, 
   }
 });
 
+/**
+ * CALENDAR EVENT MANAGEMENT
+ */
+router.get('/calendar/events', async (req, res) => {
+  try {
+    const events = await storageService.getCalendarEvents();
+    res.json({ events });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.patch('/calendar/events/:id', async (req, res) => {
+  try {
+    const updates = req.body;
+    await storageService.updateCalendarEvent(req.params.id, updates);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/calendar/events/:id', async (req, res) => {
+  try {
+    await storageService.deleteCalendarEvent(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/query', async (req, res) => {
   const startTime = Date.now();
   let finalContext = "No specific lecture notes found for this query.";

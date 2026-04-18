@@ -212,15 +212,17 @@ export class StorageService {
    * Query calendar events using keywords
    */
   async searchCalendarEvents(question) {
-    // 💡 TIER 3: ROBUST SQL LOOKUP
-    const words = question.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+    // 💡 TIER 3: ROBUST SQL LOOKUP (Fix: Including 3-letter academic keywords)
+    const academicKeys = ['mid', 'sem', 'lab', 'see', 'cie', '1st', '2nd', '3rd', '4th'];
+    const words = question.toLowerCase()
+      .split(/[\s,.-]+/)
+      .filter(w => w.length > 3 || academicKeys.includes(w));
     
     let query = supabase.from('calendar_events').select('*');
     
     if (words.length > 0) {
       // Build a multi-keyword OR filter for the top relevant terms
-      // Looking for matches in event_name or semester
-      const filterConditions = words.slice(0, 3).map(w => 
+      const filterConditions = words.slice(0, 5).map(w => 
         `event_name.ilike.%${w}%,semester.ilike.%${w}%`
       ).join(',');
 
@@ -236,13 +238,40 @@ export class StorageService {
       return data;
     }
 
-    // Default: Return upcoming events if no keywords
+    // Default: Return upcoming events
     const { data: upcoming, error: upcomingError } = await query
       .gte('date_from', new Date().toISOString().split('T')[0])
       .order('date_from', { ascending: true })
       .limit(10);
       
     return upcoming || [];
+  }
+
+  async getCalendarEvents() {
+    const { data, error } = await supabase
+      .from('calendar_events')
+      .select('*')
+      .order('date_from', { ascending: true });
+    if (error) throw error;
+    return data;
+  }
+
+  async updateCalendarEvent(id, updates) {
+    const { error } = await supabase
+      .from('calendar_events')
+      .update(updates)
+      .eq('id', id);
+    if (error) throw error;
+    return true;
+  }
+
+  async deleteCalendarEvent(id) {
+    const { error } = await supabase
+      .from('calendar_events')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+    return true;
   }
 }
 

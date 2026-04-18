@@ -225,6 +225,43 @@
             z-index: 2000; font-weight: 600;
         }
         #toast.show { transform: translateY(0); }
+        
+        /* --- CALENDAR TABLE --- */
+        .admin-table-container { 
+            width: 100%; overflow-x: auto; margin-top: 2rem; border-radius: 20px;
+            border: 1px solid var(--border); background: rgba(0,0,0,0.2);
+        }
+        .admin-table { width: 100%; border-collapse: collapse; min-width: 800px; }
+        .admin-table th { 
+            text-align: left; padding: 18px 24px; background: rgba(255,255,255,0.03);
+            color: var(--text-dim); font-size: 0.75rem; font-weight: 800; text-transform: uppercase;
+            border-bottom: 2px solid var(--border);
+        }
+        .admin-table td { 
+            padding: 16px 24px; border-bottom: 1px solid var(--border); 
+            font-size: 0.9rem; vertical-align: middle;
+        }
+        .admin-table tr:last-child td { border-bottom: none; }
+        .admin-table tr:hover { background: rgba(255,255,255,0.02); }
+        
+        /* Editable Cells */
+        [contenteditable="true"] { 
+            padding: 4px 8px; border-radius: 6px; outline: none; transition: all 0.2s;
+        }
+        [contenteditable="true"]:focus { 
+            background: rgba(255, 140, 0, 0.1); box-shadow: 0 0 0 1px var(--primary); 
+        }
+        [contenteditable="true"]:hover { background: rgba(255,255,255,0.05); }
+
+        .status-badge {
+            padding: 4px 10px; border-radius: 8px; font-size: 0.75rem; font-weight: 700;
+        }
+        .status-verified { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+        .status-approx { background: rgba(255, 140, 0, 0.1); color: var(--primary); }
+
+        .action-row { display: flex; gap: 10px; align-items: center; }
+        .save-indicator { color: var(--success); opacity: 0; transition: opacity 0.3s; }
+        .save-indicator.visible { opacity: 1; }
     </style>
 </head>
 <body>
@@ -366,6 +403,36 @@
                             <i data-lucide="calendar-plus"></i> Sync Global Calendar
                         </button>
                         <div id="calendarFiles" class="file-list" style="margin-top: 2.5rem"></div>
+                    </div>
+
+                    <!-- CALENDAR INTELLIGENCE TABLE -->
+                    <div class="glass-card" style="grid-column: 1 / -1;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                            <h3 style="display: flex; align-items: center; gap: 10px;">
+                                <i data-lucide="database" style="color: var(--primary)"></i> Extracted Intelligence
+                            </h3>
+                            <button class="btn btn-outline" style="width: auto; padding: 8px 16px;" onclick="loadCalendarEvents()">
+                                <i data-lucide="refresh-cw" style="width: 16px"></i> Refresh
+                            </button>
+                        </div>
+                        
+                        <div class="admin-table-container">
+                            <table class="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>Event Name</th>
+                                        <th>Date From</th>
+                                        <th>Date To</th>
+                                        <th>Semester</th>
+                                        <th>Type</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="calendarEventRows">
+                                    <!-- Dynamic Content -->
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -697,6 +764,76 @@
             t.style.background = isError ? 'rgba(239, 68, 68, 0.1)' : 'var(--card-bg)';
             t.classList.add('show');
             setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        // --- NEW MANAGEMENT FUNCTIONS ---
+        async function loadCalendarEvents() {
+            try {
+                const res = await fetch('/api/calendar/events');
+                const { events } = await res.json();
+                const container = document.getElementById('calendarEventRows');
+                
+                if (!events.length) {
+                    container.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-dim); padding: 4rem;">No events extracted yet. Sync a calendar to begin.</td></tr>';
+                    return;
+                }
+
+                container.innerHTML = events.map(e => `
+                    <tr data-id="${e.id}">
+                        <td contenteditable="true" onblur="handleCellEdit(this, 'event_name')">${e.event_name}</td>
+                        <td contenteditable="true" onblur="handleCellEdit(this, 'date_from')">${e.date_from || ''}</td>
+                        <td contenteditable="true" onblur="handleCellEdit(this, 'date_to')">${e.date_to || ''}</td>
+                        <td contenteditable="true" onblur="handleCellEdit(this, 'semester')">${e.semester || 'N/A'}</td>
+                        <td>
+                            <span class="status-badge ${e.date_is_approximate ? 'status-approx' : 'status-verified'}">
+                                ${e.date_is_approximate ? 'Approximate' : 'Verified'}
+                            </span>
+                        </td>
+                        <td class="action-row">
+                            <i data-lucide="check-circle" class="save-indicator"></i>
+                            <i data-lucide="trash-2" class="delete-btn" onclick="deleteCalendarEvent('${e.id}')"></i>
+                        </td>
+                    </tr>
+                `).join('');
+                lucide.createIcons();
+            } catch (err) {
+                console.error("Load Events Fail:", err);
+            }
+        }
+
+        async function handleCellEdit(el, field) {
+            const row = el.closest('tr');
+            const id = row.getAttribute('data-id');
+            const value = el.innerText.trim();
+            const indicator = row.querySelector('.save-indicator');
+
+            try {
+                const res = await fetch(`/api/calendar/events/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ [field]: value })
+                });
+
+                if (res.ok) {
+                    indicator.classList.add('visible');
+                    setTimeout(() => indicator.classList.remove('visible'), 2000);
+                }
+            } catch (err) {
+                showToast("❌ Save failed", true);
+            }
+        }
+
+        async function deleteCalendarEvent(id) {
+            if (!confirm("Permanently delete this specific event?")) return;
+            try {
+                const res = await fetch(`/api/calendar/events/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    showToast("🗑️ Event removed");
+                    loadCalendarEvents();
+                }
+            } catch (err) {
+                showToast("❌ Delete failed", true);
+            }
         }
     </script>
 </body>
