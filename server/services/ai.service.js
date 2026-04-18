@@ -179,7 +179,7 @@ export class AiService {
     STRICT FORMATTING RULE: 
     - START your message directly with your advice. 
     - NEVER use quotes ("" or '') to wrap your entire message.
-    - ELOCUTION: Always convert raw numeric dates into natural sentences.
+    - ELOCUTION: Always display dates in a concise numeric format (e.g., May 7th, 2026) for quick reading. Never spell out years in words.
     
     FACT-FIRST MANDATE: 
     - You are a Document-First assistant. Use [OFFICIAL CONTEXT] with 100% authority. 
