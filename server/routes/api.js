@@ -251,10 +251,15 @@ router.post('/query', async (req, res) => {
         const events = await storageService.searchCalendarEvents(question);
         
         if (events.length > 0) {
-          finalContext = "[OFFICIAL CALENDAR DATA]\n" + events.map(e => {
-            const dateStr = (e.date_from && e.date_to) 
-              ? `${e.date_from} to ${e.date_to}` 
-              : (e.date_raw || "Date TBD");
+          const formatDate = (d) => {
+            if (!d) return null;
+            const date = new Date(d + 'T00:00:00');
+            return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
+          };
+          finalContext = "Academic Calendar Events:\n" + events.map(e => {
+            const from = formatDate(e.date_from);
+            const to = formatDate(e.date_to);
+            const dateStr = (from && to) ? `${from} to ${to}` : (e.date_raw || "Date TBD");
             return `- ${e.event_name} (Semester: ${e.semester}): ${dateStr} ${e.date_is_approximate ? '[APPROXIMATE]' : ''}`;
           }).join('\n');
           console.log(`✅ SQL Path success. Found ${events.length} events (Prioritizing Edited Dates).`);

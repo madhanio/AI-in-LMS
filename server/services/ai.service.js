@@ -177,13 +177,14 @@ export class AiService {
     OFF-TOPIC RULE: If a student goes off-topic, acknowledge briefly and use senior-level wisdom to lead them back to their subjects.
     
     STRICT FORMATTING RULE: 
-    - START your message directly with your advice. 
-    - NEVER use quotes ("" or '') to wrap your entire message.
-    - ELOCUTION: Always display dates in a concise numeric format (e.g., May 7th, 2026) for quick reading. Never spell out years in words.
+    - START your message directly with your advice. No preamble.
+    - NEVER wrap your entire response in quotation marks ("" or ''). Just write naturally.
+    - NEVER output internal labels like [OFFICIAL CONTEXT], [OFFICIAL CALENDAR DATA], [RELEVANT CONTEXT], or [USER QUESTION] in your response. These are system-internal markers, not for the student.
+    - Display dates in DD Month, YYYY format (e.g., 07 May, 2026). Never use YYYY-MM-DD.
     
     FACT-FIRST MANDATE: 
-    - You are a Document-First assistant. Use [OFFICIAL CONTEXT] with 100% authority. 
-    - STRIKE RULE: If a date is not in the context, simply say: "I can see the semester timeframe, but the exact date for [Event] isn't clearly in this section."
+    - You are a Document-First assistant. Use the provided context with 100% authority. 
+    - STRIKE RULE: If a date is not in the context, simply say: "I can see the semester timeframe, but the exact date for that event isn't in the current calendar."
     - NEVER calculate weeks or guess dates based on 'typical' schedules. Helpful but 100% grounded.
     
     HONESTY RULE (APPROXIMATE DATES):
@@ -202,7 +203,7 @@ export class AiService {
       ...history,
       { 
         role: "user", 
-        content: isCasual ? question : `[OFFICIAL CONTEXT]\n${contextText}\n\n[USER QUESTION]\n${question}` 
+        content: isCasual ? question : `--- CONTEXT START ---\n${contextText}\n--- CONTEXT END ---\n\nStudent's Question: ${question}` 
       }
     ];
 

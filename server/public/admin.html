@@ -786,11 +786,17 @@
                     return;
                 }
 
-                container.innerHTML = events.map(e => `
+                container.innerHTML = events.map(e => {
+                    const fmtDate = (d) => {
+                        if (!d) return '';
+                        const parts = d.split('-');
+                        return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : d;
+                    };
+                    return `
                     <tr data-id="${e.id}">
                         <td contenteditable="true" onblur="handleCellEdit(this, 'event_name')">${e.event_name}</td>
-                        <td contenteditable="true" onblur="handleCellEdit(this, 'date_from')">${e.date_from || ''}</td>
-                        <td contenteditable="true" onblur="handleCellEdit(this, 'date_to')">${e.date_to || ''}</td>
+                        <td contenteditable="true" data-raw="${e.date_from || ''}" onblur="handleDateEdit(this, 'date_from')">${fmtDate(e.date_from)}</td>
+                        <td contenteditable="true" data-raw="${e.date_to || ''}" onblur="handleDateEdit(this, 'date_to')">${fmtDate(e.date_to)}</td>
                         <td contenteditable="true" onblur="handleCellEdit(this, 'semester')">${e.semester || 'N/A'}</td>
                         <td>
                             <span class="status-badge ${e.date_is_approximate ? 'status-approx' : 'status-verified'}">
@@ -801,8 +807,8 @@
                             <i data-lucide="check-circle" class="save-indicator"></i>
                             <i data-lucide="trash-2" class="delete-btn" onclick="deleteCalendarEvent('${e.id}')"></i>
                         </td>
-                    </tr>
-                `).join('');
+                    </tr>`;
+                }).join('');
                 lucide.createIcons();
             } catch (err) {
                 console.error("Load Events Fail:", err);
@@ -820,6 +826,32 @@
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ [field]: value })
+                });
+
+                if (res.ok) {
+                    indicator.classList.add('visible');
+                    setTimeout(() => indicator.classList.remove('visible'), 2000);
+                }
+            } catch (err) {
+                showToast("❌ Save failed", true);
+            }
+        }
+
+        async function handleDateEdit(el, field) {
+            const row = el.closest('tr');
+            const id = row.getAttribute('data-id');
+            const raw = el.innerText.trim();
+            const indicator = row.querySelector('.save-indicator');
+
+            // Convert DD-MM-YYYY back to YYYY-MM-DD for database
+            const parts = raw.split('-');
+            const dbValue = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : raw;
+
+            try {
+                const res = await fetch(`/api/calendar/events/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ [field]: dbValue })
                 });
 
                 if (res.ok) {
