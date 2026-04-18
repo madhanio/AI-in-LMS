@@ -273,6 +273,21 @@ export class StorageService {
     if (error) throw error;
     return true;
   }
+
+  /**
+   * PURGE LEGACY DATA
+   * Wipes out messy OCR chunks from previous attempts to stop AI confusion.
+   */
+  async purgeLegacyCalendarData() {
+    console.log("🔥 Purging Legacy Calendar Chunks...");
+    const { error } = await supabase
+      .from('documents')
+      .delete()
+      .eq('subject', '__CALENDAR__');
+    
+    if (error) throw error;
+    return true;
+  }
 }
 
 export const storageService = new StorageService();

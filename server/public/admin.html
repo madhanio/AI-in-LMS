@@ -418,6 +418,9 @@
                                 <button class="btn btn-outline" style="width: auto; padding: 8px 16px;" onclick="loadCalendarEvents()">
                                     <i data-lucide="refresh-cw" style="width: 16px"></i> Refresh
                                 </button>
+                                <button class="btn btn-outline" style="width: auto; padding: 8px 16px; border-color: var(--error); color: var(--error);" onclick="purgeCalendarData()">
+                                    <i data-lucide="flame" style="width: 16px"></i> Purge Old Data
+                                </button>
                             </div>
                         </div>
                         
@@ -850,6 +853,19 @@
                 }
             } catch (err) {
                 showToast("❌ Add failed", true);
+            }
+        }
+
+        async function purgeCalendarData() {
+            if (!confirm("⚠️ This will wipe all old messy PDF text-chunks to stop AI confusion. Your table data will REMAIN SAFE. Proceed?")) return;
+            try {
+                const res = await fetch('/api/calendar/purge', { method: 'DELETE' });
+                if (res.ok) {
+                    showToast("🔥 Old noise data purged successfully!");
+                    loadCalendarEvents();
+                }
+            } catch (err) {
+                showToast("❌ Purge failed", true);
             }
         }
     </script>

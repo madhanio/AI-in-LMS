@@ -209,6 +209,16 @@ router.post('/calendar/events', async (req, res) => {
   }
 });
 
+router.delete('/calendar/purge', async (req, res) => {
+  try {
+    await storageService.purgeLegacyCalendarData();
+    await aiService.clearCache();
+    res.json({ success: true, message: "Legacy noisy data purged." });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/query', async (req, res) => {
   const startTime = Date.now();
   let finalContext = "No specific lecture notes found for this query.";
@@ -241,10 +251,13 @@ router.post('/query', async (req, res) => {
         const events = await storageService.searchCalendarEvents(question);
         
         if (events.length > 0) {
-          finalContext = "[OFFICIAL CALENDAR DATA]\n" + events.map(e => (
-            `- ${e.event_name} (Semester: ${e.semester}): ${e.date_raw} ${e.date_is_approximate ? '[APPROXIMATE]' : ''}`
-          )).join('\n');
-          console.log(`✅ SQL Path success. Found ${events.length} events.`);
+          finalContext = "[OFFICIAL CALENDAR DATA]\n" + events.map(e => {
+            const dateStr = (e.date_from && e.date_to) 
+              ? `${e.date_from} to ${e.date_to}` 
+              : (e.date_raw || "Date TBD");
+            return `- ${e.event_name} (Semester: ${e.semester}): ${dateStr} ${e.date_is_approximate ? '[APPROXIMATE]' : ''}`;
+          }).join('\n');
+          console.log(`✅ SQL Path success. Found ${events.length} events (Prioritizing Edited Dates).`);
         } else {
           console.log("⚠️ SQL empty for calendar query. Falling back to vector search.");
         }
