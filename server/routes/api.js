@@ -270,18 +270,13 @@ router.post('/query', async (req, res) => {
 
     // TIER 3: Standard Academic Search (Only if context is still empty or not purely a calendar query)
     if (finalContext.includes("No specific lecture notes")) {
-        let queryVal = question;
-        if (question.trim().split(/\s+/).length >= 3) {
-          console.log(`Expanding academic query...`);
-          queryVal = await aiService.expandQuery(question);
-        }
-        
-        const queryEmbedding = await aiService.getEmbedding(queryVal, "query");
+        // Use raw question directly for embedding — no LLM expansion needed
+        const queryEmbedding = await aiService.getEmbedding(question, "query");
         const searchSubjects = subject ? [subject, '__CALENDAR__'] : ['__CALENDAR__'];
         const allChunks = await storageService.getAllChunks(searchSubjects);
         
         if (allChunks.length > 0) {
-          const keywords = queryVal.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+          const keywords = question.toLowerCase().split(/\s+/).filter(w => w.length > 3);
           const scoredChunks = allChunks.map(c => {
             const semanticScore = cosineSimilarity(queryEmbedding, c.embedding);
             const isCalendarChunk = c.subject === '__CALENDAR__';
@@ -299,13 +294,14 @@ router.post('/query', async (req, res) => {
 
           if (topChunks.length > 0) {
             console.log(`✅ Injecting ${topChunks.length} chunks via Vector Search.`);
-            finalContext = "[RELEVANT CONTEXT]\n" + topChunks.map(c => `[${c.file_name}] ${c.text}`).join('\n---\n');
+            finalContext = topChunks.map(c => `[${c.file_name}] ${c.text}`).join('\n---\n');
           }
         }
     }
 
-    // Get the intent for persona/depth scaling
-    const intent = await aiService.getIntent(question);
+    // Fast local intent detection (no LLM call needed)
+    const wordCount = question.trim().split(/\s+/).length;
+    const intent = wordCount >= 8 ? 'STUDY_DEEP' : 'STUDY_QUICK';
     const stream = await aiService.getChatAnswer(question, finalContext, history, subject || 'General', intent, rollNumber);
     
     // Set headers for streaming (Critical for Render/Proxy stability)
