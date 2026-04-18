@@ -107,6 +107,17 @@ router.post('/upload', authenticateAdmin, upload.single('pdfFile'), async (req, 
 
          if (events.length > 0) {
            await storageService.saveCalendarEvents(events);
+           
+           // 🔥 UI SYNC: Register file in 'documents' so it appears in the list
+           const summaryChunk = [{
+             text: `[STRUCTURED CALENDAR] Extracted ${events.length} academic events.`,
+             page_number: 1,
+             section_title: "Calendar Summary",
+             chunk_type: "text",
+             embedding: await aiService.getEmbedding(`Calendar file: ${fileName}`, "passage")
+           }];
+           await storageService.addFile(subject, fileName, summaryChunk);
+
            return res.json({ 
              message: "PDF processed via Direct-to-VLM Lane", 
              type: "tabular",
