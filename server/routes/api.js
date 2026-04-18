@@ -229,13 +229,6 @@ router.post('/query', async (req, res) => {
       return res.status(400).json({ error: "Question is required" });
     }
 
-    // 🧠 TIER 1: SEMANTIC CACHE (Local Memory)
-    const cachedAnswer = await aiService.checkCache(question);
-    if (cachedAnswer) {
-       console.log("⚡ Serving from Cache...");
-       res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-       res.setHeader('Cache-Control', 'no-cache');
-       res.flushHeaders();
        res.write(cachedAnswer);
        return res.end();
     }
@@ -247,6 +240,17 @@ router.post('/query', async (req, res) => {
     console.log(`Traffic Cop Result (is_calendar): ${isCalendar}`);
 
     if (isCalendar) {
+        // 🧠 TIER 1: SEMANTIC CACHE (Local Memory - Calendar ONLY)
+        const cachedAnswer = await aiService.checkCache(question);
+        if (cachedAnswer) {
+           console.log("⚡ Serving Calendar from Cache...");
+           res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+           res.setHeader('Cache-Control', 'no-cache');
+           res.flushHeaders();
+           res.write(cachedAnswer);
+           return res.end();
+        }
+
         console.log("📅 Routing to Structured Calendar Lane (SQL)...");
         const events = await storageService.searchCalendarEvents(question);
         
@@ -322,8 +326,8 @@ router.post('/query', async (req, res) => {
         fullResponse += text;
         res.write(value);
       }
-      // Save to Tier 1 Cache for future hits
-      if (fullResponse.length > 0) {
+      // Save to Tier 1 Cache for future hits (Calendar ONLY)
+      if (fullResponse.length > 0 && isCalendar) {
         aiService.saveToCache(question, fullResponse);
       }
     } catch (err) {
