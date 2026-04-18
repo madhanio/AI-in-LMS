@@ -228,88 +228,140 @@ export class AiService {
 
   /**
    * Multimodal structured extraction using Gemma 3 Vision via NVIDIA NIM
+   * Uses a 4-step Chain-of-Thought approach for high accuracy.
    */
-  async extractCalendarEventsFromImages(base64Images, fileName) {
-    try {
-      console.log(`🧠 Invoking Gemma 3 Vision for ${base64Images.length} images...`);
-      
-      const content = [
-        { 
-          type: "text", 
-          text: `Extract all academic calendar events from these images.
-          Return ONLY a JSON object with an "events" array. No explanation, no markdown.
+  async extractCalendarEventsFromImages(base64Images, fileName, rawText = null) {
+    // 🛡️ TIERED FALLBACK LADDER
+    const tiers = [
+      { name: "Tier 1: Gemma 3 Vision (27B)", method: () => this.extractViaGemma3Vision(base64Images, fileName) },
+      { name: "Tier 2: Llama 3.2 Vision (11B)", method: () => this.extractViaLlamaVision(base64Images, fileName) },
+      { name: "Tier 3: Text Lane (Gemma 3 Text)", method: () => this.extractCalendarEventsFromText(rawText, fileName) }
+    ];
 
-          Each object must have exactly these fields:
-          - event_name: string
-          - date_from: "YYYY-MM-DD" or null
-          - date_to: "YYYY-MM-DD" or null  
-          - date_raw: original date string as it appears in text
-          - date_is_approximate: boolean
-          - semester: string (e.g., I-I, II-II)`
+    for (const tier of tiers) {
+      try {
+        if (tier.name.includes("Text Lane") && !rawText) continue;
+        
+        console.log(`🚀 Attempting extraction via ${tier.name}...`);
+        const events = await tier.method();
+        
+        // Success condition: Found representative number of events (HITAM usually has 20+)
+        if (events && events.length >= 10) {
+          console.log(`✅ ${tier.name} succeeded with ${events.length} events.`);
+          return this.validateAndNormalizeEvents(events);
         }
-      ];
-
-      // Add each image as a part
-      base64Images.forEach(b64 => {
-        content.push({
-          type: "image_url",
-          image_url: { url: `data:image/png;base64,${b64}` }
-        });
-      });
-
-      const response = await fetch(`${BASE_URL}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${NVIDIA_VISION_KEY}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: "google/gemma-3-27b-it",
-          messages: [{ role: "user", content }],
-          max_tokens: 4096,
-          temperature: 0.1
-          // response_format might not be supported by all NIM models, fallback to strict prompt
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`❌ NVIDIA API Detailed Error [${response.status}]:`, errorText);
-        throw new Error(`Gemma 3 Vision API returned ${response.status}`);
+        console.warn(`⚠️ ${tier.name} returned too few events (${events?.length || 0}). Trying next tier...`);
+      } catch (error) {
+        console.error(`❌ ${tier.name} failed:`, error.message);
       }
-      
-      const data = await response.json();
-      const rawContent = this.cleanJsonResponse(data.choices[0]?.message?.content);
-      const parsed = JSON.parse(rawContent);
-      
-      return (parsed.events || []).map(event => ({
-        ...event,
-        source_file: fileName
-      }));
-    } catch (error) {
-      console.error("❌ Gemma 3 Vision Extraction Failed:", error);
-      return [];
     }
+
+    return [];
+  }
+
+  async extractViaGemma3Vision(base64Images, fileName) {
+    const prompt = this.getCalendarCotPrompt();
+    return this.callVisionModel("google/gemma-3-27b-it", base64Images, prompt, fileName);
+  }
+
+  async extractViaLlamaVision(base64Images, fileName) {
+    const prompt = this.getCalendarCotPrompt();
+    return this.callVisionModel("nvidia/llama-3.2-11b-vision-instruct", base64Images, prompt, fileName);
+  }
+
+  async extractCalendarEventsFromText(text, fileName) {
+    if (!text) return [];
+    const response = await fetch(`${BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${NVIDIA_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemma-3-27b-it",
+        messages: [
+          { role: "user", content: `[messy_text]\n${text}\n\n[INSTRUCTION]\nExtract all academic calendar events from the text above. Follow this format: ${this.getCalendarCotPrompt()}` }
+        ],
+        temperature: 0.1
+      })
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    const parsed = JSON.parse(this.cleanJsonResponse(data.choices[0]?.message?.content));
+    return (parsed.events || []).map(e => ({ ...e, source_file: fileName }));
+  }
+
+  getCalendarCotPrompt() {
+    return `You are an OCR and Academic Data Expert.
+CONTEXT:
+- University: Hyderabad Institute of Technology and Management (HITAM)
+- Academic Year: 2025-26
+- PDF Structure: Table with columns: S.No | Description | Duration (From | To)
+- Headers: Look for "B.TECH. I SEMESTER" or "B.TECH. II SEMESTER".
+
+FOLLOW THESE STEPS IN YOUR REASONING:
+STEP 1 - TABLE STRUCTURE ANALYSIS: Identify headers and columns.
+STEP 2 - ROW-BY-ROW EXTRACTION: For every row, extract Description, From, To, Semester.
+STEP 3 - DATE NORMALIZATION: Convert to YYYY-MM-DD.
+STEP 4 - JSON OUTPUT: reasoning summary and events array.
+
+CRITICAL RULES:
+- If you cannot read a date clearly, set it to null (don't guess).
+- Extract ALL rows, don't skip any.
+- Preserve semester information (I or II).
+- Include "row_number" (integer).
+
+JSON SCHEMA:
+{ "reasoning": "summary", "events": [{ "event_name": "string", "date_from": "YYYY-MM-DD", "date_to": "YYYY-MM-DD", "date_raw": "...", "date_is_approximate": boolean, "semester": "I or II", "row_number": integer }] }`;
+  }
+
+  async callVisionModel(model, base64Images, prompt, fileName) {
+    const content = [{ type: "text", text: prompt }];
+    base64Images.forEach(b64 => content.push({ type: "image_url", image_url: { url: `data:image/png;base64,${b64}` } }));
+
+    const response = await fetch(`${BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${NVIDIA_VISION_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "user", content }],
+        max_tokens: 4096,
+        temperature: 0.1
+      })
+    });
+
+    if (!response.ok) throw new Error(`API returned ${response.status}`);
+    const data = await response.json();
+    const parsed = JSON.parse(this.cleanJsonResponse(data.choices[0]?.message?.content || ""));
+    return (parsed.events || []).map(e => ({ ...e, source_file: fileName }));
+  }
+
+  validateAndNormalizeEvents(events) {
+    return events
+      .filter(e => e.event_name && e.event_name.trim().length > 0)
+      .map(e => {
+        let semester = e.semester || "I";
+        if (semester.toString().includes("II") || semester.toString().includes("2nd")) semester = "II";
+        else semester = "I";
+
+        let dateFrom = e.date_from;
+        let dateTo = e.date_to || dateFrom;
+
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (dateFrom && !dateRegex.test(dateFrom)) dateFrom = null;
+        if (dateTo && !dateRegex.test(dateTo)) dateTo = null;
+
+        return { ...e, semester, date_from: dateFrom, date_to: dateTo };
+      })
+      .filter(e => e.date_from || e.date_to);
   }
 
   /**
    * Helper to strip conversational text and markdown from JSON responses
+   * Robust Regex-based extraction (looks for first { and last })
    */
   cleanJsonResponse(content) {
      if (!content) return "{}";
-     
-     // Remove markdown code blocks (e.g., ```json ... ```)
      let cleaned = content.replace(/```json\n?|```\n?/g, "").trim();
-     
-     // Find the first '{' and last '}' to strip conversational prefix/suffix
-     const startIdx = cleaned.indexOf('{');
-     const endIdx = cleaned.lastIndexOf('}');
-     
-     if (startIdx !== -1 && endIdx !== -1) {
-        cleaned = cleaned.substring(startIdx, endIdx + 1);
-     }
-     
-     return cleaned;
+     const match = cleaned.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+     return match ? match[0] : cleaned;
   }
 }
 

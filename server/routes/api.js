@@ -103,7 +103,7 @@ router.post('/upload', authenticateAdmin, upload.single('pdfFile'), async (req, 
        
        try {
          const imageBase64s = await pdfService.convertToImages(req.file.buffer);
-         const events = await aiService.extractCalendarEventsFromImages(imageBase64s, fileName);
+         const events = await aiService.extractCalendarEventsFromImages(imageBase64s, fileName, text);
 
          if (events.length > 0) {
            await storageService.saveCalendarEvents(events);

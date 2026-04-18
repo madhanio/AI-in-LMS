@@ -212,17 +212,22 @@ export class PdfService {
 
   /**
    * Converts all pages of a PDF buffer into an array of image buffers (Base64 ready)
+   * High-res 300 DPI / 2480px width ensures table lines and small fonts are clear for VLM.
    */
   async convertToImages(buffer) {
     try {
-      console.log("📸 Converting PDF to high-quality images for VLM Lane...");
+      const density = 300;
+      const width = 2480;
+      
+      console.log(`📸 Converting PDF to high-quality images (Width: ${width}px, Density: ${density}DPI)...`);
       
       // pdf-img-convert returns an array of Uint8Arrays
       const images = await pdfConverter.convert(buffer, {
-        width: 1200,      // Sufficient for table reading
-        density: 200,    // High resolution for clear text
+        width: width,
+        density: density,
       });
       
+      console.log(`✅ Converted ${images.length} pages at 300 DPI.`);
       return images.map(img => Buffer.from(img).toString("base64"));
     } catch (error) {
       console.error("❌ PDF-to-Image Conversion Failed:", error);
