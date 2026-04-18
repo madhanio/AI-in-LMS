@@ -85,6 +85,15 @@ export class AiService {
   }
 
   /**
+   * FLUSH ALL MEMORY
+   * Forces the AI to learn new data immediately after an edit.
+   */
+  async clearCache() {
+    console.log("🧠 Flushing Semantic Cache...");
+    semanticCache.clear();
+  }
+
+  /**
    * TIER 2: THE TRAFFIC COP (LLM GATEKEEPER)
    * Strictly determines if the query is schedule/calendar related.
    */

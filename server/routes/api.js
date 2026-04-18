@@ -176,6 +176,7 @@ router.patch('/calendar/events/:id', async (req, res) => {
   try {
     const updates = req.body;
     await storageService.updateCalendarEvent(req.params.id, updates);
+    await aiService.clearCache(); // 🔥 Learn the fix immediately
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -185,6 +186,23 @@ router.patch('/calendar/events/:id', async (req, res) => {
 router.delete('/calendar/events/:id', async (req, res) => {
   try {
     await storageService.deleteCalendarEvent(req.params.id);
+    await aiService.clearCache(); // 🔥 Forget the old data
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/calendar/events', async (req, res) => {
+  try {
+    const newEvent = {
+        event_name: "New Manual Event",
+        date_raw: "TBD",
+        semester: "N/A",
+        date_is_approximate: true
+    };
+    await storageService.saveCalendarEvents([newEvent]);
+    await aiService.clearCache();
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

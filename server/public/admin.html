@@ -411,9 +411,14 @@
                             <h3 style="display: flex; align-items: center; gap: 10px;">
                                 <i data-lucide="database" style="color: var(--primary)"></i> Extracted Intelligence
                             </h3>
-                            <button class="btn btn-outline" style="width: auto; padding: 8px 16px;" onclick="loadCalendarEvents()">
-                                <i data-lucide="refresh-cw" style="width: 16px"></i> Refresh
-                            </button>
+                            <div style="display: flex; gap: 10px;">
+                                <button class="btn btn-outline" style="width: auto; padding: 8px 16px; border-color: var(--primary); color: var(--primary);" onclick="addCalendarEvent()">
+                                    <i data-lucide="plus-circle" style="width: 16px"></i> Add Entry
+                                </button>
+                                <button class="btn btn-outline" style="width: auto; padding: 8px 16px;" onclick="loadCalendarEvents()">
+                                    <i data-lucide="refresh-cw" style="width: 16px"></i> Refresh
+                                </button>
+                            </div>
                         </div>
                         
                         <div class="admin-table-container">
@@ -833,6 +838,18 @@
                 }
             } catch (err) {
                 showToast("❌ Delete failed", true);
+            }
+        }
+
+        async function addCalendarEvent() {
+            try {
+                const res = await fetch('/api/calendar/events', { method: 'POST' });
+                if (res.ok) {
+                    showToast("➕ New row added");
+                    loadCalendarEvents();
+                }
+            } catch (err) {
+                showToast("❌ Add failed", true);
             }
         }
     </script>
