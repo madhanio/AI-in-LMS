@@ -351,6 +351,19 @@ export class PdfService {
       let sectionMatches = textUpToChunk.slice(Math.max(0, currentIndex - 200), currentIndex).match(/\n([A-Z][A-Za-z\s]{2,40})\n/g);
       if (sectionMatches && sectionMatches.length > 0) {
         currentSection = sectionMatches[sectionMatches.length - 1].trim();
+        
+        // ✨ Intelligence: Extract Module Number from section title if present
+        // Matches: "Module - II", "UNIT 3", "CHAPTER 1", "Module 4"
+        const moduleMatch = currentSection.match(/(?:Module|Unit|Chapter)\s+([0-9]+|[IVX]+)/i);
+        if (moduleMatch) {
+          const val = moduleMatch[1].toUpperCase();
+          if (val === "I") currentPageModule = 1;
+          else if (val === "II") currentPageModule = 2;
+          else if (val === "III") currentPageModule = 3;
+          else if (val === "IV") currentPageModule = 4;
+          else if (val === "V") currentPageModule = 5;
+          else if (!isNaN(parseInt(val))) currentPageModule = parseInt(val);
+        }
       }
 
       if (chunkStr.length > 50) {
@@ -359,7 +372,8 @@ export class PdfService {
           page_number: currentPage,
           section_title: currentSection,
           chunk_type: chunkType,
-          is_structured: isStructured
+          is_structured: isStructured,
+          module_number: currentPageModule // Now dynamically updated
         });
       }
       

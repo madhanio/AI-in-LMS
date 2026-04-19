@@ -315,9 +315,10 @@ export class AiService {
               
               RULES:
               - moduleNumber: Extract any mentioned Unit number or Module number (e.g., 'Unit 2' or 'Module 2' -> 2).
+                - *Institutional Rule*: If filename is 'MID-1' or 'MID-I' and no module is mentioned, pick '1'. If 'MID-2' or 'MID-II', pick '4'.
               - partNumber: Extract any mentioned part number (e.g., 'Part 1' -> 1).
               - docType:
-                - 'QUESTION_BANK': lists of exam questions or marks distributions.
+                - 'QUESTION_BANK': lists of exam questions or marks distributions (e.g., 'MID-1 QB', 'Assignment').
                 - 'MODEL_PAPER': sample or previous year papers.
                 - 'MODULE_RESOURCE': Default for notes/study material.
               - contentType: 'TABULAR' for calendars/schedules, else 'TEXT'.
@@ -373,6 +374,7 @@ export class AiService {
               FILTER RULES:
               - docType: If they mention 'questions', 'bank', 'quiz' -> 'QUESTION_BANK'. If they mention 'paper', 'model' -> 'MODEL_PAPER'.
               - moduleNumber: If they mention 'module 1', 'unit 1', etc. -> extract the number.
+                - *MID Rule*: 'MID-1' -> [1,2,3], 'MID-2' -> [3,4,5]. If 'MID-1' is asked, targetModule can be 1 (primary).
 
               JSON SCHEMA:
               {
