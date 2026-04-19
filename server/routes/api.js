@@ -104,7 +104,7 @@ router.post('/upload', authenticateAdmin, upload.single('pdfFile'), async (req, 
     }
 
     // 🔥 NEW: Deep Metadata Classification
-    const metadata = await aiService.classifyContent(text);
+    const metadata = await aiService.classifyContent(text, fileName);
     console.log(`Metadata for ${fileName}:`, metadata);
 
     // If it's a calendar or the AI says TABULAR, route to vision lane

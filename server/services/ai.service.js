@@ -298,10 +298,10 @@ export class AiService {
   }
 
   /**
-   * Performs a deep scan of the text to extract doc_type, module_number, and part_number.
+   * Performs a deep scan of the text AND filename to extract doc_type, module_number, and part_number.
    */
-  async classifyContent(text) {
-    if (!text) return { contentType: "TEXT", docType: "MODULE_RESOURCE", moduleNumber: null, partNumber: null };
+  async classifyContent(text, fileName = "") {
+    if (!text && !fileName) return { contentType: "TEXT", docType: "MODULE_RESOURCE", moduleNumber: null, partNumber: null };
     try {
       const response = await fetch(`${BASE_URL}/chat/completions`, {
         method: "POST",
@@ -311,14 +311,17 @@ export class AiService {
           messages: [
             {
               role: "system",
-              content: `Analyze the academic text and extract metadata in JSON format.
+              content: `Analyze the provided academic text and filename to extract metadata in JSON format.
               
-              TYPES:
-              - 'TABULAR': If it is an academic calendar, timetable, or schedule.
-              - 'QUESTION_BANK': If it lists bank of questions or potential exam questions.
-              - 'MODEL_PAPER': If it is a sample/previous year question paper.
-              - 'MODULE_RESOURCE': Default for lecture notes and study material.
-
+              RULES:
+              - moduleNumber: Extract any mentioned Unit number or Module number (e.g., 'Unit 2' or 'Module 2' -> 2).
+              - partNumber: Extract any mentioned part number (e.g., 'Part 1' -> 1).
+              - docType:
+                - 'QUESTION_BANK': lists of exam questions or marks distributions.
+                - 'MODEL_PAPER': sample or previous year papers.
+                - 'MODULE_RESOURCE': Default for notes/study material.
+              - contentType: 'TABULAR' for calendars/schedules, else 'TEXT'.
+              
               JSON SCHEMA:
               {
                 "contentType": "TABULAR" | "TEXT",
@@ -327,7 +330,7 @@ export class AiService {
                 "partNumber": number | null
               }`
             },
-            { role: "user", content: text.slice(0, 4000) }
+            { role: "user", content: `FILENAME: ${fileName}\n\nCONTENT SAMPLE:\n${text.slice(0, 4000)}` }
           ],
           temperature: 0.1,
           response_format: { type: "json_object" }
