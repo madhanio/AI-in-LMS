@@ -66,20 +66,92 @@ export class PdfService {
   }
 
   /**
-   * Extracts text from .docx using mammoth
+   * Extracts text from .docx using mammoth with HTML-to-Markdown table preservation
    */
   async docxToText(buffer) {
-    const result = await mammoth.extractRawText({ buffer });
-    return result.value || "";
+    const result = await mammoth.convertToHtml({ buffer });
+    let html = result.value || "";
+    return this.htmlToMarkdown(html);
   }
 
   /**
-   * Extracts text from .doc using word-extractor
+   * Extracts text from .doc using word-extractor with Tab-to-Markdown reconstruction
    */
   async docToText(buffer) {
     const extractor = new WordExtractor();
     const doc = await extractor.extract(buffer);
-    return doc.getBody() || "";
+    const rawText = doc.getBody() || "";
+    return this.reconstructTablesFromTabs(rawText);
+  }
+
+  /**
+   * Converts basic HTML tables to Markdown pipes
+   */
+  htmlToMarkdown(html) {
+    if (!html) return "";
+    
+    let processed = html
+      // Convert Bold
+      .replace(/<strong>(.*?)<\/strong>|<b>(.*?)<\/b>/g, "**$1$2**")
+      // Convert Italics
+      .replace(/<em>(.*?)<\/em>|<i>(.*?)<\/i>/g, "*$1$2*")
+      // Handle Tables
+      .replace(/<table.*?>([\s\S]*?)<\/table>/g, (match, tableContent) => {
+        const rows = tableContent.match(/<tr.*?>([\s\S]*?)<\/tr>/g) || [];
+        let mdTable = "\n";
+        
+        rows.forEach((row, index) => {
+          const cells = row.match(/<td.*?>([\s\S]*?)<\/td>|<th.*?>([\s\S]*?)<\/th>/g) || [];
+          const mdRow = "| " + cells.map(cell => cell.replace(/<.*?>/g, "").trim()).join(" | ") + " |\n";
+          mdTable += mdRow;
+          
+          // Add separator after the first row
+          if (index === 0) {
+            mdTable += "| " + cells.map(() => "---").join(" | ") + " |\n";
+          }
+        });
+        
+        return mdTable + "\n";
+      })
+      // Strip remaining tags but keep structure
+      .replace(/<p.*?>/g, "\n")
+      .replace(/<\/p>/g, "\n")
+      .replace(/<br\s*\/?>/g, "\n")
+      .replace(/<.*?>/g, "");
+
+    return processed;
+  }
+
+  /**
+   * Heals tab-separated .doc tables into Markdown pipes
+   */
+  reconstructTablesFromTabs(text) {
+    if (!text) return "";
+    
+    const lines = text.split("\n");
+    let inTable = false;
+    const processedLines = lines.map((line, i) => {
+      const trimmed = line.trim();
+      const tabCount = (line.match(/\t/g) || []).length;
+      
+      // If a line has 2+ tabs, it's likely a table row
+      if (tabCount >= 2) {
+        let mdRow = "| " + line.split("\t").map(cell => cell.trim()).filter(c => c.length > 0 || tabCount > 2).join(" | ") + " |";
+        
+        // If this is the start of a table block, inject a separator after this first row
+        if (!inTable) {
+          inTable = true;
+          // Look ahead: if next lines also have tabs, this is a multi-row table
+          return "\n" + mdRow + "\n" + "| " + line.split("\t").map(() => "---").filter(c => c === "---").join(" | ") + " |";
+        }
+        return mdRow;
+      } else {
+        inTable = false;
+        return line;
+      }
+    });
+
+    return processedLines.join("\n");
   }
 
   /**
@@ -223,8 +295,8 @@ export class PdfService {
 
     // 1. Detect if the overall text seems structured (Tabular/QB/Lists)
     // Heuristic: Many tabs, pipe characters, or repetitive numeric patterns
-    const isStructured = (text.match(/[\t|]/g) || []).length > 20 || 
-                         (text.match(/\n\d+\. /g) || []).length > 5;
+    const isStructured = (text.match(/[|\t]/g) || []).length > 10 || 
+                         (text.match(/\n\d+[\t. ]/g) || []).length > 5;
 
     // 2. Run Cleaning & Normalization Pipeline
     let processedText = this.cleanRawText(text, isStructured);
