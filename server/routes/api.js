@@ -107,8 +107,11 @@ router.post('/upload', authenticateAdmin, upload.single('pdfFile'), async (req, 
     const metadata = await aiService.classifyContent(text, fileName);
     console.log(`Metadata for ${fileName}:`, metadata);
 
-    // If it's a calendar or the AI says TABULAR, route to vision lane
-    if (metadata.contentType === 'TABULAR' || subject === '__CALENDAR__') {
+    // 🔥 NEW: Format Guard - Only PDFs can use the Direct-to-VLM Vision Lane
+    const isPDF = fileName.toLowerCase().endsWith('.pdf');
+
+    // If it's a calendar or the AI says TABULAR, route to vision lane (PDF ONLY)
+    if (isPDF && (metadata.contentType === 'TABULAR' || subject === '__CALENDAR__')) {
        console.log("➡️ Routing to Direct-to-VLM Structured Lane...");
        
        try {
