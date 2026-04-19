@@ -4,12 +4,14 @@ class Message {
   final bool isUser;
   final bool isSystemSwitch;
   final DateTime createdAt;
+  List<Map<String, dynamic>>? sources; // Added for RAG citations
   
   Message({
     required this.id,
     required this.text,
     required this.isUser,
     this.isSystemSwitch = false,
+    this.sources,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
@@ -19,6 +21,7 @@ class Message {
     'isUser': isUser,
     'isSystemSwitch': isSystemSwitch,
     'createdAt': createdAt.toIso8601String(),
+    if (sources != null) 'sources': sources,
   };
 
   factory Message.fromJson(Map<String, dynamic> json) => Message(
@@ -27,5 +30,8 @@ class Message {
     isUser: json['isUser'],
     isSystemSwitch: json['isSystemSwitch'] ?? false,
     createdAt: DateTime.parse(json['createdAt']),
+    sources: json['sources'] != null 
+        ? List<Map<String, dynamic>>.from(json['sources']) 
+        : null,
   );
 }

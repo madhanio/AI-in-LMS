@@ -17,6 +17,7 @@ class ChatProvider extends ChangeNotifier {
   bool _isLoadingSubjects = false;
   bool _isLoadingSuggestions = false;
   String? _selectedSubject;
+  String? _currentSessionId;
   bool _isStreaming = false;
   bool _isTyping = false;
   bool _greetingGenerated = false;
@@ -98,33 +99,55 @@ class ChatProvider extends ChangeNotifier {
     await _getAIResponse(prompt, []);
   }
 
-  /// 🏛️ ARCHIVE LOGIC: Saves the current session before clearing
-  Future<void> _archiveCurrentSession() async {
+  /// 🏛️ ARCHIVE LOGIC: Live updates the active session to history
+  Future<void> _updateOrSaveCurrentSession() async {
     if (_messages.length <= 1) return; // Don't save empty/greeting-only chats
 
-    // Generate a title from the first user message
-    String title = "New Session";
-    final firstUserMsg = _messages.firstWhere((m) => m.isUser, orElse: () => _messages[0]);
-    title = firstUserMsg.text.length > 30 
-        ? "${firstUserMsg.text.substring(0, 27)}..." 
-        : firstUserMsg.text;
+    if (_currentSessionId == null) {
+      _currentSessionId = DateTime.now().millisecondsSinceEpoch.toString();
+      
+      // Generate a title from the first user message
+      String title = "New Session";
+      final firstUserMsg = _messages.firstWhere((m) => m.isUser, orElse: () => _messages[0]);
+      title = firstUserMsg.text.length > 30 
+          ? "${firstUserMsg.text.substring(0, 27)}..." 
+          : firstUserMsg.text;
 
-    final session = ChatSession(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      title: title,
-      messages: List.from(_messages),
-      timestamp: DateTime.now(),
-      subject: _selectedSubject,
-    );
+      final session = ChatSession(
+        id: _currentSessionId!,
+        title: title,
+        messages: List.from(_messages),
+        timestamp: DateTime.now(),
+        subject: _selectedSubject,
+      );
+      _history.insert(0, session);
+    } else {
+      final index = _history.indexWhere((s) => s.id == _currentSessionId);
+      if (index != -1) {
+        _history[index].messages = List.from(_messages);
+      }
+    }
+    await _saveHistory();
+  }
 
-    _history.insert(0, session);
+  void deleteSession(String id) async {
+    _history.removeWhere((session) => session.id == id);
+    if (_currentSessionId == id) {
+      // If we deleted the active chat, reset it quietly
+      _messages.clear();
+      _currentSessionId = null;
+      _greetingGenerated = false;
+      generateInitialGreeting();
+    }
+    notifyListeners();
     await _saveHistory();
   }
 
   /// Clears the current chat and starts a fresh AI session
   void resetChat() async {
-    await _archiveCurrentSession();
+    await _updateOrSaveCurrentSession();
     _messages.clear();
+    _currentSessionId = null;
     _selectedSubject = null;
     _greetingGenerated = false;
     notifyListeners();
@@ -134,6 +157,7 @@ class ChatProvider extends ChangeNotifier {
   /// Loads a past session from history
   void loadSession(ChatSession session) {
     _messages.clear();
+    _currentSessionId = session.id;
     _messages.addAll(session.messages);
     _selectedSubject = session.subject;
     _greetingGenerated = true; // Prevents re-greeting on load
@@ -278,6 +302,14 @@ class ChatProvider extends ChangeNotifier {
             
             if (choices != null && choices.isNotEmpty) {
               final delta = choices[0]['delta'];
+
+              // Intercept the custom sources payload directly sent from our backend's SSE payload
+              if (delta != null && delta['sources'] != null && assistantMsg != null) {
+                  assistantMsg!.sources = List<Map<String, dynamic>>.from(delta['sources']);
+                  notifyListeners();
+                  continue;
+              }
+
               final content = delta?['content'];
 
               if (content != null && content.isNotEmpty) {
@@ -306,6 +338,7 @@ class ChatProvider extends ChangeNotifier {
       if (assistantMsg != null) {
         assistantMsg!.text = assistantMsg!.text.replaceAll(' ▌', '');
       }
+      _updateOrSaveCurrentSession(); // Automatically save progress to history without explicitly ending chat
       notifyListeners();
     } catch (e) {
       _isTyping = false;

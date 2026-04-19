@@ -90,6 +90,29 @@ class HistoryDrawer extends StatelessWidget {
         Navigator.pop(context);
         provider.loadSession(session);
       },
+      onLongPress: () {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text('Delete Session', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+            content: Text('Are you sure you want to delete this chat session?'),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+              ),
+              TextButton(
+                onPressed: () {
+                  provider.deleteSession(session.id);
+                  Navigator.pop(ctx);
+                },
+                child: const Text('Delete', style: TextStyle(color: Colors.red)),
+              ),
+            ],
+          ),
+        );
+      },
       borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.all(16),

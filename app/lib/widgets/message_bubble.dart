@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/message.dart';
 
 class MessageBubble extends StatelessWidget {
@@ -74,7 +75,6 @@ class MessageBubble extends StatelessWidget {
                   ),
                 ),
           ),
-          Padding(
             padding: const EdgeInsets.only(bottom: 12, left: 4, right: 4),
             child: Text(
               DateFormat('hh:mm a').format(message.createdAt),
@@ -84,6 +84,36 @@ class MessageBubble extends StatelessWidget {
               ),
             ),
           ),
+          if (!message.isUser && message.sources != null && message.sources!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12, left: 4, right: 4),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: message.sources!.map((s) {
+                  return ActionChip(
+                    avatar: const Icon(Icons.picture_as_pdf, size: 14, color: Color(0xFFFF8C00)),
+                    label: Text(
+                      s['name'] ?? 'Document',
+                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF1C1C1E)),
+                    ),
+                    backgroundColor: Colors.white,
+                    side: BorderSide(color: Colors.grey.shade200),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    elevation: 0,
+                    onPressed: () async {
+                      final url = s['url'];
+                      if (url != null) {
+                        final uri = Uri.parse(url);
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        }
+                      }
+                    },
+                  );
+                }).toList(),
+              ),
+            ),
         ],
       ),
     );
