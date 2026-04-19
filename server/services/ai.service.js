@@ -519,13 +519,26 @@ JSON SCHEMA:
 
   /**
    * Helper to strip conversational text and markdown from JSON responses
-   * Robust Regex-based extraction (looks for first { and last })
+   * Robust Regex-based extraction (looks for the first valid JSON block)
    */
   cleanJsonResponse(content) {
     if (!content) return "{}";
+    
+    // Remove markdown code blocks if present
     let cleaned = content.replace(/```json\n?|```\n?/g, "").trim();
+    
+    // Find the first { and the last }
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      // Extract ONLY what is between the first and last brace
+      return cleaned.substring(firstBrace, lastBrace + 1);
+    }
+    
+    // Fallback to original match logic if braces are missing/mangled
     const match = cleaned.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-    return match ? match[0] : cleaned;
+    return match ? match[0] : "{}";
   }
 }
 
