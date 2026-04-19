@@ -61,7 +61,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: const Color(0xFFF5F5F7),
+      backgroundColor: const Color(0xFFFEFDFB),
       drawer: const HistoryDrawer(),
       appBar: AppBar(
           backgroundColor: Colors.white,
@@ -70,13 +70,33 @@ class _AiChatScreenState extends State<AiChatScreen> {
             icon: const Icon(Icons.menu, color: Color(0xFF1C1C1E), size: 22),
             onPressed: () => _scaffoldKey.currentState?.openDrawer(),
           ),
-          title: Text(
-             'Academic Mentor',
-             style: GoogleFonts.inter(
-               color: const Color(0xFF1C1C1E),
-               fontWeight: FontWeight.w700,
-               fontSize: 18,
-             ),
+          title: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.school, color: Color(0xFFF98012), size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Academic Mentor',
+                    style: GoogleFonts.inter(
+                      color: const Color(0xFF1C1C1E),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 18,
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                'AI powered Syllabus Expert',
+                style: GoogleFonts.inter(
+                  color: Colors.grey.shade500,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
           centerTitle: true,
           actions: [
@@ -112,6 +132,44 @@ class _AiChatScreenState extends State<AiChatScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                       itemCount: messages.length + extraWidgets,
                       itemBuilder: (context, index) {
+                        // ✨ EMPTY STATE: Fill the 'Grey Void' with helpful context
+                        if (messages.isEmpty && !isTyping) {
+                           return Container(
+                             height: MediaQuery.of(context).size.height * 0.5,
+                             alignment: Alignment.center,
+                             child: Column(
+                               mainAxisAlignment: MainAxisAlignment.center,
+                               children: [
+                                 Container(
+                                   padding: const EdgeInsets.all(24),
+                                   decoration: BoxDecoration(
+                                     color: const Color(0xFFF98012).withOpacity(0.05),
+                                     shape: BoxShape.circle,
+                                   ),
+                                   child: const Icon(Icons.auto_stories_outlined, size: 64, color: Color(0xFFF98012)),
+                                 ),
+                                 const SizedBox(height: 24),
+                                 Text(
+                                   'Ask anything from your syllabus',
+                                   style: GoogleFonts.inter(
+                                     fontSize: 18,
+                                     fontWeight: FontWeight.w600,
+                                     color: const Color(0xFF1C1C1E),
+                                   ),
+                                 ),
+                                 const SizedBox(height: 8),
+                                 Text(
+                                   'Get instant answers, summaries, and exam tips',
+                                   style: GoogleFonts.inter(
+                                     fontSize: 14,
+                                     color: Colors.grey.shade500,
+                                   ),
+                                 ),
+                               ],
+                             ),
+                           );
+                        }
+
                         if (index < messages.length) {
                           return MessageBubble(message: messages[index]);
                         }

@@ -36,7 +36,14 @@ class _InputBarState extends State<InputBar> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, -4),
+          ),
+        ],
+        border: Border(top: BorderSide(color: Colors.grey.shade100)),
       ),
       child: Row(
         children: [

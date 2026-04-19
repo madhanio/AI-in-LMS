@@ -14,6 +14,7 @@ class HistoryDrawer extends StatelessWidget {
 
     return Drawer(
       backgroundColor: Colors.white,
+      surfaceTintColor: Colors.white,
       width: MediaQuery.of(context).size.width * 0.8,
       child: Column(
         children: [
@@ -40,7 +41,7 @@ class HistoryDrawer extends StatelessWidget {
   Widget _buildHeader(BuildContext context, ChatProvider provider) {
     return Container(
       padding: const EdgeInsets.only(top: 60, left: 20, right: 20, bottom: 20),
-      color: const Color(0xFFF98012).withValues(alpha: 0.05),
+      color: Colors.white,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -62,17 +63,16 @@ class HistoryDrawer extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          ElevatedButton.icon(
+          OutlinedButton.icon(
             onPressed: () {
               Navigator.pop(context);
               provider.resetChat();
             },
             icon: const Icon(Icons.add, size: 18),
             label: const Text('New Chat'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFF98012),
-              foregroundColor: Colors.white,
-              elevation: 0,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFFF98012),
+              side: const BorderSide(color: Color(0xFFF98012), width: 1.5),
               minimumSize: const Size(double.infinity, 45),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -122,7 +122,7 @@ class HistoryDrawer extends StatelessWidget {
           border: Border.all(color: Colors.grey.shade200),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
+              color: Colors.black.withOpacity(0.02),
               blurRadius: 10,
               offset: const Offset(0, 4),
             )
@@ -149,7 +149,7 @@ class HistoryDrawer extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.blue.withValues(alpha: 0.1),
+                      color: Colors.blue.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -182,13 +182,29 @@ class HistoryDrawer extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.history_toggle_off, size: 48, color: Colors.grey.shade300),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.history_edu_outlined, size: 40, color: Colors.grey.shade300),
+          ),
           const SizedBox(height: 16),
           Text(
             'No history yet',
             style: GoogleFonts.inter(
-              color: Colors.grey.shade500,
+              color: Colors.grey.shade400,
               fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Your chat sessions will appear here',
+            style: GoogleFonts.inter(
+              color: Colors.grey.shade300,
+              fontSize: 11,
             ),
           ),
         ],
@@ -199,12 +215,16 @@ class HistoryDrawer extends StatelessWidget {
   Widget _buildFooter() {
     return Container(
       padding: const EdgeInsets.all(20),
-      child: Text(
-        'Sassy Mentor v1.5',
-        style: GoogleFonts.inter(
-          fontSize: 10,
-          color: Colors.grey.shade400,
-          letterSpacing: 1,
+      child: Opacity(
+        opacity: 0.3,
+        child: Text(
+          'Academic Mentor v1.5',
+          style: GoogleFonts.inter(
+            fontSize: 9,
+            color: Colors.grey.shade500,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
         ),
       ),
     );
