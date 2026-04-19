@@ -87,6 +87,15 @@ router.post('/upload', authenticateAdmin, upload.single('pdfFile'), async (req, 
     }
 
     console.log(`Processing ${fileName} for ${subject}...`);
+
+    // 🔥 NEW: Upload the raw PDF to Supabase Storage for Source UI
+    const fileUrl = await storageService.uploadRawFile(fileName, req.file.buffer, subject);
+    if (!fileUrl) {
+       console.log("⚠️ Supabase Storage upload failed. Chunks will be generated without viewable source links.");
+    } else {
+       console.log(`✅ Raw PDF uploaded. Public URL: ${fileUrl}`);
+    }
+
     const { text, source } = await pdfService.extractText(req.file.buffer);
     
     if (!text || text.trim().length === 0) {
@@ -312,6 +321,10 @@ router.post('/query', async (req, res) => {
           if (topChunks.length > 0) {
             console.log(`✅ Injecting ${topChunks.length} chunks via Vector Search.`);
             finalContext = topChunks.map(c => `[${c.file_name}] ${c.text}`).join('\n---\n');
+            
+            // Extract unique filenames for RAG source links
+            const uniqueNames = [...new Set(topChunks.map(c => c.file_name).filter(n => n))];
+            req.sourceUrls = await storageService.getFileUrls(uniqueNames);
           }
         }
     }
@@ -338,7 +351,16 @@ router.post('/query', async (req, res) => {
         if (done) break;
         const text = new TextDecoder().decode(value);
         fullResponse += text;
-        res.write(value);
+
+        if (text.includes('data: [DONE]') && Object.keys(req.sourceUrls || {}).length > 0) {
+           const payloadText = JSON.stringify({
+              choices: [{ delta: { sources: Object.entries(req.sourceUrls).map(([n, u]) => ({name: n, url: u})) } }]
+           });
+           res.write(new TextEncoder().encode(`data: ${payloadText}\n\n`));
+           res.write(value);
+        } else {
+           res.write(value);
+        }
       }
       // Save to Tier 1 Cache for future hits (Calendar ONLY)
       if (fullResponse.length > 0 && isCalendar) {

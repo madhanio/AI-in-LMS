@@ -149,6 +149,45 @@ export class StorageService {
     return false;
   }
 
+  /**
+   * Upload raw PDF to Supabase Storage Bucket
+   */
+  async uploadRawFile(fileName, buffer, subject) {
+    const bucketName = 'academic_materials';
+    // Clean filename for URL safety
+    const safeName = fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+    const path = `${subject ? subject.replace(/[^a-zA-Z0-9]/g, '') : 'global'}/${Date.now()}_${safeName}`;
+
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from(bucketName)
+      .upload(path, buffer, {
+        contentType: 'application/pdf',
+        upsert: true
+      });
+
+    if (uploadError) {
+      console.error("Supabase Storage Upload Error:", uploadError);
+      return null;
+    }
+
+    const { data: publicUrlData } = supabase.storage.from(bucketName).getPublicUrl(path);
+    const publicUrl = publicUrlData.publicUrl;
+
+    // Attempt to insert metadata into syllabus_files
+    try {
+      await supabase.from('syllabus_files').insert([{
+        filename: fileName,
+        bucket_path: path,
+        public_url: publicUrl,
+        subject: subject
+      }]);
+    } catch (e) {
+      console.warn("Could not insert into syllabus_files. Ensure table exists.", e);
+    }
+
+    return publicUrl;
+  }
+
   async getAllChunks(filterSubjects = null) {
     let query = supabase.from('documents').select('content, embedding, page_number, section_title, file_name, chunk_type');
     
@@ -175,6 +214,30 @@ export class StorageService {
       file_name: d.file_name,
       chunk_type: d.chunk_type
     }));
+  }
+
+  /**
+   * Fast lookup to get public URLs for injected chunks
+   */
+  async getFileUrls(fileNames) {
+    if (!fileNames || fileNames.length === 0) return {};
+    
+    // Fetch distinct filenames and their urls from syllabus_files
+    const { data, error } = await supabase
+      .from('syllabus_files')
+      .select('filename, public_url')
+      .in('filename', fileNames);
+
+    if (error) {
+      console.warn("Failed to fetch file URLs:", error);
+      return {};
+    }
+
+    const urlMap = {};
+    data.forEach(row => {
+      urlMap[row.filename] = row.public_url;
+    });
+    return urlMap;
   }
 
   async logQuery(question, retrievedChunksCount, avgSimilarity, responseTimeMs, subject) {
