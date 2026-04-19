@@ -322,6 +322,8 @@ export class AiService {
                 - 'MODULE_RESOURCE': Default for notes/study material.
               - contentType: 'TABULAR' for calendars/schedules, else 'TEXT'.
               
+              CRITICAL: YOU MUST USE DOUBLE QUOTES FOR ALL KEYS AND STRINGS. DO NOT USE SINGLE QUOTES. DO NOT LEAVE TRAILING COMMAS.
+              
               JSON SCHEMA:
               {
                 "contentType": "TABULAR" | "TEXT",
@@ -527,10 +529,18 @@ JSON SCHEMA:
   cleanJsonResponse(content) {
     if (!content) return "{}";
     
-    // Remove markdown code blocks if present
+    // 1. Remove markdown code blocks if present
     let cleaned = content.replace(/```json\n?|```\n?/g, "").trim();
     
-    // Find the first { and the last }
+    // 2. Repair common LLM syntax errors (Single quotes instead of Double quotes)
+    // Fix keys: 'key': -> "key":
+    cleaned = cleaned.replace(/(['])?([a-zA-Z0-9_]+)(['])?\s*:/g, '"$2":');
+    // Fix string values: : 'value' -> : "value"
+    cleaned = cleaned.replace(/:\s*'([^']*)'/g, ': "$1"');
+    // Remove trailing commas: , } -> }
+    cleaned = cleaned.replace(/,\s*([\}\]])/g, '$1');
+    
+    // 3. Find the first { and the last }
     const firstBrace = cleaned.indexOf('{');
     const lastBrace = cleaned.lastIndexOf('}');
     
