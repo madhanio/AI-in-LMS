@@ -75,6 +75,7 @@ class MessageBubble extends StatelessWidget {
                   ),
                 ),
           ),
+          Padding(
             padding: const EdgeInsets.only(bottom: 12, left: 4, right: 4),
             child: Text(
               DateFormat('hh:mm a').format(message.createdAt),

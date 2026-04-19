@@ -4,10 +4,7 @@ import 'calendar_screen.dart';
 import 'ai_chat_screen.dart';
 import 'providers/chat_provider.dart';
 
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'constants.dart';
-import 'screens/login_screen.dart';
-import 'providers/auth_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,12 +14,7 @@ void main() async {
   );
 
   runApp(
-    MultiProvider(
       providers: [
-        ChangeNotifierProvider(
-          create: (_) => AuthProvider(),
-          lazy: false,
-        ),
         ChangeNotifierProvider(
           create: (_) => ChatProvider(),
           lazy: false, // 🚀 PERFORMANCE FIX: Pre-warm the AI brain for instant transition
@@ -50,34 +42,12 @@ class MyApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFF8F9FA),
         fontFamily: 'Roboto', 
       ),
-      home: const AuthWrapper(),
+      home: const DashboardScreen(),
     );
   }
 }
 
-class AuthWrapper extends StatelessWidget {
-  const AuthWrapper({super.key});
 
-  @override
-  Widget build(BuildContext context) {
-    return Consumer<AuthProvider>(
-      builder: (context, auth, _) {
-        if (auth.isLoading) {
-          return const Scaffold(
-            backgroundColor: Color(0xFFF98012),
-            body: Center(
-              child: CircularProgressIndicator(color: Colors.white),
-            ),
-          );
-        }
-        if (auth.isAuthenticated) {
-          return const DashboardScreen();
-        }
-        return const LoginScreen();
-      },
-    );
-  }
-}
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -119,22 +89,20 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             icon: const Icon(Icons.search, color: Colors.black, size: 24),
             onPressed: () {},
           ),
-          Consumer<AuthProvider>(
-              builder: (context, auth, _) => Padding(
-                padding: const EdgeInsets.only(right: 16.0),
-                child: InkWell(
-                  onTap: () => Scaffold.of(context).openEndDrawer(),
-                  child: CircleAvatar(
-                    backgroundColor: Colors.purple[700],
-                    radius: 16,
-                    child: Text(
-                      (auth.currentStudent?['name'] ?? 'U')[0].toUpperCase(),
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
-                    ),
-                  ),
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0),
+            child: InkWell(
+              onTap: () => Scaffold.of(context).openEndDrawer(),
+              child: CircleAvatar(
+                backgroundColor: Colors.purple[700],
+                radius: 16,
+                child: const Text(
+                  'A',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
                 ),
               ),
             ),
+          ),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(48),
@@ -551,27 +519,18 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             ),
             const Divider(height: 1),
             
-            // User Profile Row
-            Consumer<AuthProvider>(
-              builder: (context, auth, _) {
-                final studentObj = auth.currentStudent;
-                final fullName = studentObj?['name'] ?? 'Guest User';
-                final studentId = studentObj?['student_id'] ?? 'Not Logged In';
-                final initial = fullName.isNotEmpty ? fullName[0].toUpperCase() : 'G';
-
-                return ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.purple[700],
-                    radius: 24,
-                    child: Text(initial, style: const TextStyle(color: Colors.white, fontSize: 20)),
-                  ),
-                  title: Text(fullName),
-                  subtitle: Text(studentId),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {},
-                );
-              },
+            // Static Admin Profile Row
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              leading: CircleAvatar(
+                backgroundColor: Colors.purple[700],
+                radius: 24,
+                child: const Text('A', style: TextStyle(color: Colors.white, fontSize: 20)),
+              ),
+              title: const Text('Admin'),
+              subtitle: const Text('Data Science'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {},
             ),
             const Divider(height: 1),
             
@@ -599,31 +558,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ),
             ),
             
-            // Log out button
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFC7362E), // Moodle red log out button
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                  ),
-                  icon: const Icon(Icons.logout),
-                  label: const Text('Log out', style: TextStyle(fontSize: 16)),
-                  onPressed: () async {
-                    await Provider.of<AuthProvider>(context, listen: false).logOut();
-                    if (!context.mounted) return;
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => const LoginScreen()),
-                      (route) => false,
-                    );
-                  },
-                ),
-              ),
-            ),
+
           ],
         ),
       ),

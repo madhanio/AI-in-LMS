@@ -3,7 +3,7 @@ import 'message.dart';
 class ChatSession {
   final String id;
   final String title;
-  final List<Message> messages;
+  List<Message> messages;
   final DateTime timestamp;
   final String? subject;
 
