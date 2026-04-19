@@ -92,8 +92,15 @@ class MessageBubble extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 4,
                 children: message.sources!.map((s) {
+                  final fileName = (s['name'] ?? 'Document').toLowerCase();
+                  final isWord = fileName.endsWith('.doc') || fileName.endsWith('.docx');
+                  
                   return ActionChip(
-                    avatar: const Icon(Icons.picture_as_pdf, size: 14, color: Color(0xFFFF8C00)),
+                    avatar: Icon(
+                      isWord ? Icons.description : Icons.picture_as_pdf, 
+                      size: 14, 
+                      color: const Color(0xFFFF8C00)
+                    ),
                     label: Text(
                       s['name'] ?? 'Document',
                       style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF1C1C1E)),
@@ -107,7 +114,7 @@ class MessageBubble extends StatelessWidget {
                       if (url != null) {
                         try {
                           final uri = Uri.parse(url);
-                          // We use externalApplication to ensure the system's browser or PDF viewer handles it
+                          // We use externalApplication to ensure the system's browser, PDF viewer, or Word app handles it
                           final success = await launchUrl(
                             uri, 
                             mode: LaunchMode.externalApplication,
@@ -115,7 +122,7 @@ class MessageBubble extends StatelessWidget {
                           
                           if (!success && context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Could not open PDF link')),
+                              SnackBar(content: Text('Could not open ${isWord ? "document" : "PDF"} link')),
                             );
                           }
                         } catch (e) {

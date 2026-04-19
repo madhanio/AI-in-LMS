@@ -188,10 +188,17 @@ export class StorageService {
     const safeName = fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
     const path = `${subject ? subject.replace(/[^a-zA-Z0-9]/g, '') : 'global'}/${Date.now()}_${safeName}`;
 
+    let contentType = 'application/pdf';
+    if (fileName.endsWith('.docx')) {
+      contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    } else if (fileName.endsWith('.doc')) {
+      contentType = 'application/msword';
+    }
+
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from(bucketName)
       .upload(path, buffer, {
-        contentType: 'application/pdf',
+        contentType: contentType,
         upsert: true
       });
 

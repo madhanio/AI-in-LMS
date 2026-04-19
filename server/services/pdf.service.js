@@ -7,50 +7,79 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import pdfConverter from "pdf-img-convert";
+import mammoth from "mammoth";
+import WordExtractor from "word-extractor";
 
 export class PdfService {
   /**
-   * Extracts text from PDF buffer and injects page markers.
-   * Now includes RESILIENT TRIPLE-PASS OCR fallback!
+   * Extracts text from PDF, DOCX, or DOC buffer.
    */
-  async extractText(buffer) {
-    // 1. Try standard extraction first
-    const render_page = (pageData) => {
-      let render_options = { normalizeWhitespace: false, disableCombineTextItems: false };
-      return pageData.getTextContent(render_options).then(function(textContent) {
-        let text = '';
-        let lastY = null;
-        for (let item of textContent.items) {
-          if (lastY == item.transform[5] || !lastY) {
-            text += item.str;
-          } else {
-            text += '\n' + item.str;
-          }
-          lastY = item.transform[5];
-        }
-        return `\n\n[PAGE_MARKER_${pageData.pageIndex + 1}]\n\n` + text;
-      });
-    };
-
-    const data = await pdfParse(buffer, { pagerender: render_page });
-    let text = data?.text || "";
+  async extractText(buffer, fileName = "") {
+    const ext = path.extname(fileName).toLowerCase();
+    let text = "";
     let source = "vector";
 
-    // 2. OCR Fallback: If text is suspiciously small (scanned image)
-    if (text.trim().length < 100) {
-      console.log("🧩 Scanned PDF detected. Triggering Resilient OCR Pipeline...");
-      try {
-        const ocrText = await this.performOcr(buffer);
-        if (ocrText && ocrText.trim().length > 0) {
-            text = ocrText;
-            source = "ocr";
+    try {
+      if (ext === '.docx') {
+        text = await this.docxToText(buffer);
+        source = "docx";
+      } else if (ext === '.doc') {
+        text = await this.docToText(buffer);
+        source = "doc";
+      } else {
+        // Default to PDF
+        const render_page = (pageData) => {
+          let render_options = { normalizeWhitespace: false, disableCombineTextItems: false };
+          return pageData.getTextContent(render_options).then(function(textContent) {
+            let pageText = '';
+            let lastY = null;
+            for (let item of textContent.items) {
+              if (lastY == item.transform[5] || !lastY) {
+                pageText += item.str;
+              } else {
+                pageText += '\n' + item.str;
+              }
+              lastY = item.transform[5];
+            }
+            return `\n\n[PAGE_MARKER_${pageData.pageIndex + 1}]\n\n` + pageText;
+          });
+        };
+
+        const data = await pdfParse(buffer, { pagerender: render_page });
+        text = data?.text || "";
+
+        // OCR Fallback for scanned PDFs
+        if (text.trim().length < 100) {
+          console.log("🧩 Scanned PDF detected. Triggering Resilient OCR Pipeline...");
+          const ocrText = await this.performOcr(buffer);
+          if (ocrText && ocrText.trim().length > 0) {
+              text = ocrText;
+              source = "ocr";
+          }
         }
-      } catch (ocrError) {
-        console.error("❌ High-Level OCR Pipeline Failed:", ocrError);
       }
+    } catch (error) {
+      console.error(`❌ Extraction error for ${fileName}:`, error);
     }
 
     return { text: text || "", source };
+  }
+
+  /**
+   * Extracts text from .docx using mammoth
+   */
+  async docxToText(buffer) {
+    const result = await mammoth.extractRawText({ buffer });
+    return result.value || "";
+  }
+
+  /**
+   * Extracts text from .doc using word-extractor
+   */
+  async docToText(buffer) {
+    const extractor = new WordExtractor();
+    const doc = await extractor.extract(buffer);
+    return doc.getBody() || "";
   }
 
   /**

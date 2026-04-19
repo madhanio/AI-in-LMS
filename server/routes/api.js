@@ -96,7 +96,7 @@ router.post('/upload', authenticateAdmin, upload.single('pdfFile'), async (req, 
        console.log(`✅ Raw PDF uploaded. Public URL: ${fileUrl}`);
     }
 
-    const { text, source } = await pdfService.extractText(req.file.buffer);
+    const { text, source } = await pdfService.extractText(req.file.buffer, fileName);
     
     if (!text || text.trim().length === 0) {
       console.log("❌ CRITICAL: No text could be extracted from PDF. Aborting.");
