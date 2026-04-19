@@ -29,7 +29,7 @@ export class AiService {
           input: batch,
           input_type: inputType,
           encoding_format: "float",
-          truncate: "NONE"
+          truncate: "END"
         })
       });
       if (!response.ok) throw new Error(`Embedding Error: ${await response.text()}`);
