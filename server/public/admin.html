@@ -262,6 +262,38 @@
         .action-row { display: flex; gap: 10px; align-items: center; }
         .save-indicator { color: var(--success); opacity: 0; transition: opacity 0.3s; }
         .save-indicator.visible { opacity: 1; }
+
+        /* --- MODEL TOGGLE --- */
+        .model-toggle-card {
+            padding: 16px; margin: 0 16px 12px; border-radius: 14px;
+            background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+        }
+        .model-toggle-card label {
+            font-size: 0.7rem; text-transform: uppercase; font-weight: 800;
+            color: var(--text-dim); letter-spacing: 1px; margin-bottom: 10px; display: block;
+        }
+        .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .toggle-label { font-size: 0.8rem; font-weight: 600; }
+        .toggle-label.active { color: var(--primary); }
+        .toggle-switch {
+            position: relative; width: 48px; height: 26px; cursor: pointer;
+        }
+        .toggle-switch input { display: none; }
+        .toggle-slider {
+            position: absolute; inset: 0; background: rgba(255,255,255,0.1);
+            border-radius: 26px; transition: 0.3s;
+        }
+        .toggle-slider:before {
+            content: ''; position: absolute; width: 20px; height: 20px;
+            left: 3px; bottom: 3px; background: white; border-radius: 50%;
+            transition: 0.3s;
+        }
+        .toggle-switch input:checked + .toggle-slider {
+            background: var(--primary);
+        }
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(22px);
+        }
     </style>
 </head>
 <body>
@@ -312,6 +344,17 @@
                 <i data-lucide="calendar"></i> <span>Academic Calendar</span>
             </div>
             <div style="flex: 1"></div>
+            <div class="model-toggle-card">
+                <label>🧠 AI Engine</label>
+                <div class="toggle-row">
+                    <span class="toggle-label" id="label8b">Fast 8B</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="modelToggle" onchange="toggleModel()">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span class="toggle-label" id="label70b">Smart 70B</span>
+                </div>
+            </div>
             <div class="nav-item" style="color: var(--error)" onclick="logout()">
                 <i data-lucide="log-out"></i> <span>Sign Out</span>
             </div>
@@ -900,6 +943,38 @@
                 showToast("❌ Purge failed", true);
             }
         }
+
+        // --- MODEL TOGGLE ---
+        async function loadModelSetting() {
+            try {
+                const res = await fetch('/api/settings/model');
+                const { model } = await res.json();
+                const is70b = model.includes('70b');
+                document.getElementById('modelToggle').checked = is70b;
+                document.getElementById('label8b').classList.toggle('active', !is70b);
+                document.getElementById('label70b').classList.toggle('active', is70b);
+            } catch (e) { console.error('Model load fail', e); }
+        }
+
+        async function toggleModel() {
+            const is70b = document.getElementById('modelToggle').checked;
+            const model = is70b ? 'meta/llama-3.1-70b-instruct' : 'meta/llama-3.1-8b-instruct';
+            document.getElementById('label8b').classList.toggle('active', !is70b);
+            document.getElementById('label70b').classList.toggle('active', is70b);
+            try {
+                await fetch('/api/settings/model', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model })
+                });
+                showToast(is70b ? '🧠 Switched to Smart 70B' : '⚡ Switched to Fast 8B');
+            } catch (e) {
+                showToast('❌ Switch failed', true);
+            }
+        }
+
+        // Load model setting on page load
+        loadModelSetting();
     </script>
 </body>
 </html>

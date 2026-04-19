@@ -219,6 +219,23 @@ router.delete('/calendar/purge', async (req, res) => {
   }
 });
 
+/**
+ * LIVE MODEL TOGGLE
+ */
+router.get('/settings/model', (req, res) => {
+  res.json({ model: aiService.getModel() });
+});
+
+router.post('/settings/model', authenticateAdmin, (req, res) => {
+  const { model } = req.body;
+  const success = aiService.setModel(model);
+  if (success) {
+    res.json({ success: true, model });
+  } else {
+    res.status(400).json({ error: "Invalid model. Use 'meta/llama-3.1-8b-instruct' or 'meta/llama-3.1-70b-instruct'." });
+  }
+});
+
 router.post('/query', async (req, res) => {
   const startTime = Date.now();
   let finalContext = "No specific lecture notes found for this query.";

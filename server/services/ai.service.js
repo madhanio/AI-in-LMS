@@ -8,6 +8,9 @@ const BASE_URL = "https://integrate.api.nvidia.com/v1";
 // 🧠 TIER 1: SEMANTIC CACHE (Local In-Memory)
 const semanticCache = new Map();
 
+// 🔧 LIVE MODEL TOGGLE (Admin-controllable, no redeploy needed)
+let currentModel = "meta/llama-3.1-8b-instruct";
+
 export class AiService {
   async getEmbeddings(texts, inputType = "passage") {
     const BATCH_SIZE = 50;
@@ -93,6 +96,18 @@ export class AiService {
     semanticCache.clear();
   }
 
+  getModel() {
+    return currentModel;
+  }
+
+  setModel(model) {
+    const allowed = ["meta/llama-3.1-8b-instruct", "meta/llama-3.1-70b-instruct"];
+    if (!allowed.includes(model)) return false;
+    currentModel = model;
+    console.log(`🔧 Model switched to: ${model}`);
+    return true;
+  }
+
   /**
    * TIER 2: THE TRAFFIC COP (LLM GATEKEEPER)
    * Strictly determines if the query is schedule/calendar related.
@@ -119,14 +134,14 @@ export class AiService {
       if (!response.ok) return false;
       const data = await response.json();
       const raw = data.choices[0]?.message?.content || "";
-      
+
       // Robust JSON extraction: find the first {...} in the response
       const jsonMatch = raw.match(/\{[^}]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         return parsed.is_calendar === true;
       }
-      
+
       // Fallback: check if the raw text simply contains "true"
       return raw.toLowerCase().includes('"is_calendar": true') || raw.toLowerCase().includes('"is_calendar":true');
     } catch (e) {
@@ -158,7 +173,7 @@ export class AiService {
       });
       const data = await response.json();
       const content = (data.choices[0]?.message?.content || 'CASUAL').toUpperCase();
-      
+
       if (content.includes('CALENDAR')) return 'CALENDAR_QUERY';
       if (content.includes('DEEP')) return 'STUDY_DEEP';
       if (content.includes('QUICK')) return 'STUDY_QUICK';
@@ -171,10 +186,8 @@ export class AiService {
   async getChatAnswer(question, contextText, history = [], subject = "General Academics", intent = "STUDY_QUICK", rollNumber = "") {
     const isDeep = intent === "STUDY_DEEP";
     const isCasual = intent === "CASUAL";
-    // 🔧 MODEL SWITCH: Change this line for Demo Day
-    // Daily use:  "meta/llama-3.1-8b-instruct"
-    // Demo Day:   "meta/llama-3.1-70b-instruct"
-    const modelToUse = "meta/llama-3.1-8b-instruct";
+    const modelToUse = currentModel;
+    console.log(`🧠 Using model: ${modelToUse}`);
 
     const now = new Date();
     const dateString = now.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -227,9 +240,9 @@ export class AiService {
     const chatMessages = [
       { role: "system", content: systemPrompt },
       ...history,
-      { 
-        role: "user", 
-        content: isCasual ? question : `--- CONTEXT START ---\n${contextText}\n--- CONTEXT END ---\n\nStudent's Question: ${question}` 
+      {
+        role: "user",
+        content: isCasual ? question : `--- CONTEXT START ---\n${contextText}\n--- CONTEXT END ---\n\nStudent's Question: ${question}`
       }
     ];
 
@@ -330,10 +343,10 @@ export class AiService {
     for (const tier of tiers) {
       try {
         if (tier.name.includes("Text Lane") && !rawText) continue;
-        
+
         console.log(`🚀 Attempting extraction via ${tier.name}...`);
         const events = await tier.method();
-        
+
         // Success condition: Found representative number of events (HITAM usually has 20+)
         if (events && events.length >= 10) {
           console.log(`✅ ${tier.name} succeeded with ${events.length} events.`);
@@ -447,10 +460,10 @@ JSON SCHEMA:
    * Robust Regex-based extraction (looks for first { and last })
    */
   cleanJsonResponse(content) {
-     if (!content) return "{}";
-     let cleaned = content.replace(/```json\n?|```\n?/g, "").trim();
-     const match = cleaned.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-     return match ? match[0] : cleaned;
+    if (!content) return "{}";
+    let cleaned = content.replace(/```json\n?|```\n?/g, "").trim();
+    const match = cleaned.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+    return match ? match[0] : cleaned;
   }
 }
 
