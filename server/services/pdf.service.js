@@ -54,17 +54,70 @@ export class PdfService {
   }
 
   /**
-   * Data Preprocessing & Cleaning: Strips OCR artifacts and normalizes text
+   * Advanced Text Cleaning: Strips headers, footers, watermarks, and academic noise
    */
-  cleanOcrNoise(text) {
+  cleanRawText(text, isStructured = false) {
+    if (!text) return "";
+    
+    // 1. Basic unicode & non-printable normalization
+    let cleaned = text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, "");
+
+    // Split into lines to apply row-level filters
+    const lines = cleaned.split("\n");
+    const filteredLines = lines.filter(line => {
+      const trimmed = line.trim();
+      if (!trimmed) return false;
+
+      // Skip common divider lines
+      if (/^[_\-.\s]{3,}$/.test(trimmed)) return false;
+
+      // Skip lines that are just numbers (Likely page numbers)
+      if (/^\s*\d+\s*$/.test(trimmed) || /^\s*Page\s+\d+\s+/i.test(trimmed)) return false;
+
+      // Skip academic noise if NOT a structured table
+      if (!isStructured) {
+          // Rule: Remove lines shorter than 40 chars unless it looks like a header we want to KEEP
+          // (We keep unit headers for the chunker to find, but we'll strip them in the cleaning below)
+          if (trimmed.length < 40 && !/^(UNIT|MODULE|CHAPTER)\s+[0-9IVX]+/i.test(trimmed)) {
+            return false;
+          }
+      }
+
+      // Boilerplate & Academic Noise Regex Strip
+      const noisePatterns = [
+        /HITAM/i,
+        /Regulation\s+R(19|20|22)/i,
+        /\bR(19|20|22)\b/i,
+        /B\.Tech/i,
+        /Prepared\s+by/i,
+        /Department\s+of/i,
+        /\bCO[1-6]\b/i, // CO1, CO2...
+        /Bloom's\s+Level/i,
+        /\bBL:\s*[1-6]\b/i,
+        /References:/i,
+        /www\./i,
+        /Fig(ure)?\s+\d+(\.\d+)?/i,
+        /Copyright\s+.*All\s+rights\s+reserved/i
+      ];
+
+      if (noisePatterns.some(pattern => pattern.test(trimmed))) return false;
+
+      return true;
+    });
+
+    return filteredLines.join("\n");
+  }
+
+  /**
+   * Pre-chunk Normalization: Fixes PDF parsing artifacts
+   */
+  normalizeText(text) {
     if (!text) return "";
     return text
-      .replace(/~~/g, "") // Remove common Tesseract noise markers
-      .replace(/\|/g, " ") // Normalize table pipes into spaces
-      .replace(/ {2,}/g, " ") // Normalize multiple spaces
-      .replace(/(\d{2})\s(\d{2})\s(\d{4})/g, "$1.$2.$3") // Fix broken dates
-      .replace(/2Spell/g, "2nd Spell") // Correct common OCR misreads
-      .replace(/1Spell/g, "1st Spell")
+      .replace(/(\w+)-\n(\w+)/g, "$1$2") // Fix hyphenation: "transmis-\nsion" -> "transmission"
+      .replace(/(\.)([A-Z])/g, "$1 $2") // Ensure space after period before a new sentence
+      .replace(/[ \t]{2,}/g, " ") // Normalize multiple spaces/tabs to single space
+      .replace(/\n{3,}/g, "\n\n") // Collapse excessive newlines to double newlines
       .trim();
   }
 
@@ -133,31 +186,37 @@ export class PdfService {
   /**
    * Splits text into overlapping chunks and extracts metadata
    */
-  chunkText(text, size = 1800, overlap = 350) {
+  chunkText(text, size = 2500, overlap = 500) {
     if (!text) {
       console.log("⚠️ chunkText received empty/undefined text. Skipping.");
       return [];
     }
-    // We clean spaces but keep track of pages
+
+    // 1. Detect if the overall text seems structured (Tabular/QB/Lists)
+    // Heuristic: Many tabs, pipe characters, or repetitive numeric patterns
+    const isStructured = (text.match(/[\t|]/g) || []).length > 20 || 
+                         (text.match(/\n\d+\. /g) || []).length > 5;
+
+    // 2. Run Cleaning & Normalization Pipeline
+    let processedText = this.cleanRawText(text, isStructured);
+    processedText = this.normalizeText(processedText);
+
+    if (processedText.length < 50) {
+       console.log("⚠️ Text reduced too significantly during cleaning. Falling back to raw.");
+       processedText = text;
+    }
+
     const chunks = [];
-    
-    // We can run a state machine to track the current page.
     let currentIndex = 0;
     let currentPage = 1;
     let currentSection = "General";
 
-    // Split text into tokens/words to better handle the page markers
-    // But since we want raw character overlap, let's track the nearest page marker.
-    
-    // Remove multiple spaces but allow newlines/markers to stand
-    const cleanText = text.replace(/ {2,}/g, " ").trim();
-
-    while (currentIndex < cleanText.length) {
+    while (currentIndex < processedText.length) {
       let nextIndex = currentIndex + size;
       
-      if (nextIndex < cleanText.length) {
+      if (nextIndex < processedText.length) {
         let breakIndex = nextIndex;
-        while (breakIndex > currentIndex && cleanText[breakIndex] !== ' ' && cleanText[breakIndex] !== '.' && cleanText[breakIndex] !== '\n') {
+        while (breakIndex > currentIndex && processedText[breakIndex] !== ' ' && processedText[breakIndex] !== '.' && processedText[breakIndex] !== '\n') {
           breakIndex--;
         }
         if (breakIndex > currentIndex) {
@@ -165,22 +224,21 @@ export class PdfService {
         }
       }
       
-      let rawChunk = cleanText.slice(currentIndex, nextIndex).trim();
+      let rawChunk = processedText.slice(currentIndex, nextIndex).trim();
 
       // HEURISTIC: Find the latest page marker in the chunk or before it
-      // Let's find all markers up to nextIndex
-      let textUpToChunk = cleanText.slice(0, nextIndex);
+      let textUpToChunk = processedText.slice(0, nextIndex);
       let pageMatches = [...textUpToChunk.matchAll(/\[PAGE_MARKER_(\d+)\]/g)];
       if (pageMatches.length > 0) {
         currentPage = parseInt(pageMatches[pageMatches.length - 1][1]);
       }
 
-      // Remove page markers from the final chunk text so the LLM doesn't see them as noise
+      // Remove page markers from the final chunk text
       let chunkStr = rawChunk.replace(/\[PAGE_MARKER_\d+\]/g, "").trim();
 
       // Special Content Detection
-      let chunkType = "text";
-      if (chunkStr.match(/\$\$?.*?\$\$?/)) {
+      let chunkType = isStructured ? "tabular" : "text";
+      if (chunkStr.match(/\$\$?.*?\Bonding\$\$?/)) {
         chunkType = "math";
         chunkStr = `[LATEX EQUATION] ${chunkStr}`;
       } else if (chunkStr.match(/\b(def|class|function|import|export|if|for|while|return)\b.*?\{/)) {
@@ -188,18 +246,19 @@ export class PdfService {
         chunkStr = `[CODE SNIPPET]\n${chunkStr}`;
       }
 
-      // Heuristic Section extraction: look for short, capitalized lines before this chunk in recent history
+      // Heuristic Section extraction: look for short, capitalized lines before this chunk
       let sectionMatches = textUpToChunk.slice(Math.max(0, currentIndex - 200), currentIndex).match(/\n([A-Z][A-Za-z\s]{2,40})\n/g);
       if (sectionMatches && sectionMatches.length > 0) {
         currentSection = sectionMatches[sectionMatches.length - 1].trim();
       }
 
-      if (chunkStr.length > 20) {
+      if (chunkStr.length > 50) {
         chunks.push({
           text: chunkStr,
           page_number: currentPage,
           section_title: currentSection,
-          chunk_type: chunkType
+          chunk_type: chunkType,
+          is_structured: isStructured
         });
       }
       

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 dotenv.config();
 
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -101,26 +102,55 @@ export class StorageService {
     return subjects;
   }
 
-  async addFile(subject, fileName, chunksWithEmbeds) {
+  async addFile(subject, fileName, chunksWithEmbeds, metadata = {}) {
     if (subject === '__CALENDAR__' && chunksWithEmbeds.length === 0) {
        console.log("⚠️ Ignoring empty calendar sync to avoid data loss.");
        return false;
     }
 
-    const rows = chunksWithEmbeds.map(chunk => ({
-      subject,
-      file_name: fileName,
-      content: chunk.text,
-      embedding: chunk.embedding,
-      page_number: chunk.page_number || null,
-      section_title: chunk.section_title || null,
-      chunk_type: chunk.chunk_type || 'text'
-    }));
+    // 1. Generate hashes and prepare rows
+    const rows = chunksWithEmbeds.map(chunk => {
+      const hash = crypto.createHash('md5').update(chunk.text).digest('hex');
+      return {
+        subject,
+        file_name: fileName,
+        content: chunk.text,
+        embedding: chunk.embedding,
+        page_number: chunk.page_number || null,
+        section_title: chunk.section_title || null,
+        chunk_type: chunk.chunk_type || 'text',
+        doc_type: metadata.docType || 'MODULE_RESOURCE',
+        module_number: metadata.moduleNumber || null,
+        part_number: metadata.partNumber || null,
+        chunk_hash: hash,
+        is_structured: chunk.is_structured || false
+      };
+    });
 
-    // Insert in batches of 50 to avoid Supabase limits on large PDFs
+    // 2. Fetch existing hashes for this subject to prevent duplicates
+    const { data: existingHashes } = await supabase
+      .from('documents')
+      .select('chunk_hash')
+      .eq('subject', subject);
+    
+    const existingSet = new Set((existingHashes || []).map(h => h.chunk_hash));
+
+    // 3. Filter out duplicates
+    const uniqueRows = rows.filter(row => !existingSet.has(row.chunk_hash));
+    
+    if (uniqueRows.length === 0) {
+      console.log(`♻️ All ${rows.length} chunks from ${fileName} are duplicates. Skipping insertion.`);
+      return true;
+    }
+
+    if (uniqueRows.length < rows.length) {
+      console.log(`✂️ Deduplicated: ${rows.length - uniqueRows.length} redundant chunks removed.`);
+    }
+
+    // 4. Insert in batches of 50 to avoid Supabase limits on large PDFs
     const BATCH_SIZE = 50;
-    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-        const batch = rows.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < uniqueRows.length; i += BATCH_SIZE) {
+        const batch = uniqueRows.slice(i, i + BATCH_SIZE);
         const { error } = await supabase
           .from('documents')
           .insert(batch);
@@ -152,7 +182,7 @@ export class StorageService {
   /**
    * Upload raw PDF to Supabase Storage Bucket
    */
-  async uploadRawFile(fileName, buffer, subject) {
+  async uploadRawFile(fileName, buffer, subject, metadata = {}) {
     const bucketName = 'academic_materials';
     // Clean filename for URL safety
     const safeName = fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
@@ -179,7 +209,10 @@ export class StorageService {
         filename: fileName,
         bucket_path: path,
         public_url: publicUrl,
-        subject: subject
+        subject: subject,
+        doc_type: metadata.docType || 'MODULE_RESOURCE',
+        module_number: metadata.moduleNumber || null,
+        part_number: metadata.partNumber || null
       }]);
     } catch (e) {
       console.warn("Could not insert into syllabus_files. Ensure table exists.", e);
@@ -189,7 +222,7 @@ export class StorageService {
   }
 
   async getAllChunks(filterSubjects = null) {
-    let query = supabase.from('documents').select('content, embedding, page_number, section_title, file_name, chunk_type');
+    let query = supabase.from('documents').select('content, embedding, page_number, section_title, file_name, chunk_type, doc_type, module_number, part_number, is_structured');
     
     if (filterSubjects) {
       if (Array.isArray(filterSubjects)) {
@@ -212,7 +245,11 @@ export class StorageService {
       page_number: d.page_number,
       section_title: d.section_title,
       file_name: d.file_name,
-      chunk_type: d.chunk_type
+      chunk_type: d.chunk_type,
+      doc_type: d.doc_type,
+      module_number: d.module_number,
+      part_number: d.part_number,
+      is_structured: d.is_structured
     }));
   }
 

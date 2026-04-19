@@ -298,10 +298,10 @@ export class AiService {
   }
 
   /**
-   * Classifies if the extracted text is primarily tabular (Calendar/Timetable)
+   * Performs a deep scan of the text to extract doc_type, module_number, and part_number.
    */
   async classifyContent(text) {
-    if (!text) return "TEXT";
+    if (!text) return { contentType: "TEXT", docType: "MODULE_RESOURCE", moduleNumber: null, partNumber: null };
     try {
       const response = await fetch(`${BASE_URL}/chat/completions`, {
         method: "POST",
@@ -311,20 +311,82 @@ export class AiService {
           messages: [
             {
               role: "system",
-              content: "Classify if the text is an ACADEMIC CALENDAR, TIMETABLE, or SCHEDULE. Output only 'TABULAR' or 'TEXT'."
+              content: `Analyze the academic text and extract metadata in JSON format.
+              
+              TYPES:
+              - 'TABULAR': If it is an academic calendar, timetable, or schedule.
+              - 'QUESTION_BANK': If it lists bank of questions or potential exam questions.
+              - 'MODEL_PAPER': If it is a sample/previous year question paper.
+              - 'MODULE_RESOURCE': Default for lecture notes and study material.
+
+              JSON SCHEMA:
+              {
+                "contentType": "TABULAR" | "TEXT",
+                "docType": "MODULE_RESOURCE" | "QUESTION_BANK" | "MODEL_PAPER",
+                "moduleNumber": number | null,
+                "partNumber": number | null
+              }`
             },
-            { role: "user", content: text.slice(0, 3000) } // Sample the text
+            { role: "user", content: text.slice(0, 4000) }
           ],
           temperature: 0.1,
-          max_tokens: 10
+          response_format: { type: "json_object" }
         })
       });
       const data = await response.json();
-      const result = (data.choices[0]?.message?.content || "TEXT").toUpperCase();
-      return result.includes("TABULAR") ? "TABULAR" : "TEXT";
+      const raw = data.choices[0]?.message?.content || "{}";
+      const meta = JSON.parse(this.cleanJsonResponse(raw));
+      
+      return {
+        contentType: meta.contentType || "TEXT",
+        docType: meta.docType || "MODULE_RESOURCE",
+        moduleNumber: meta.moduleNumber || null,
+        partNumber: meta.partNumber || null
+      };
     } catch (e) {
-      console.error("Classification Error:", e);
-      return "TEXT";
+      console.error("Deep Classification Error:", e);
+      return { contentType: "TEXT", docType: "MODULE_RESOURCE", moduleNumber: null, partNumber: null };
+    }
+  }
+
+  /**
+   * TIER 2.5: INTENT FILTER EXTRACTION
+   * Detects if the student is specifically asking for a QB, Model Paper, or a specific Module.
+   */
+  async extractQueryMetadata(question) {
+    try {
+      const response = await fetch(`${BASE_URL}/chat/completions`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${NVIDIA_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "meta/llama-3.1-8b-instruct",
+          messages: [
+            {
+              role: "system",
+              content: `Extract search filters from the student's question in JSON format.
+              
+              FILTER RULES:
+              - docType: If they mention 'questions', 'bank', 'quiz' -> 'QUESTION_BANK'. If they mention 'paper', 'model' -> 'MODEL_PAPER'.
+              - moduleNumber: If they mention 'module 1', 'unit 1', etc. -> extract the number.
+
+              JSON SCHEMA:
+              {
+                "targetDocType": "MODULE_RESOURCE" | "QUESTION_BANK" | "MODEL_PAPER" | null,
+                "targetModule": number | null
+              }`
+            },
+            { role: "user", content: question }
+          ],
+          temperature: 0.1,
+          response_format: { type: "json_object" }
+        })
+      });
+      const data = await response.json();
+      const raw = data.choices[0]?.message?.content || "{}";
+      return JSON.parse(this.cleanJsonResponse(raw));
+    } catch (e) {
+      console.error("Intent Filter Error:", e);
+      return { targetDocType: null, targetModule: null };
     }
   }
 

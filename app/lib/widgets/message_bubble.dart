@@ -105,9 +105,25 @@ class MessageBubble extends StatelessWidget {
                     onPressed: () async {
                       final url = s['url'];
                       if (url != null) {
-                        final uri = Uri.parse(url);
-                        if (await canLaunchUrl(uri)) {
-                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        try {
+                          final uri = Uri.parse(url);
+                          // We use externalApplication to ensure the system's browser or PDF viewer handles it
+                          final success = await launchUrl(
+                            uri, 
+                            mode: LaunchMode.externalApplication,
+                          );
+                          
+                          if (!success && context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Could not open PDF link')),
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error: $e')),
+                            );
+                          }
                         }
                       }
                     },

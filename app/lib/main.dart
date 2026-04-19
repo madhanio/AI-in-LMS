@@ -4,6 +4,7 @@ import 'calendar_screen.dart';
 import 'ai_chat_screen.dart';
 import 'providers/chat_provider.dart';
 
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'constants.dart';
 
 void main() async {
@@ -14,6 +15,7 @@ void main() async {
   );
 
   runApp(
+    MultiProvider(
       providers: [
         ChangeNotifierProvider(
           create: (_) => ChatProvider(),

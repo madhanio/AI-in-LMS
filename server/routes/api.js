@@ -103,11 +103,12 @@ router.post('/upload', authenticateAdmin, upload.single('pdfFile'), async (req, 
       return res.status(422).json({ error: "No readable content found in PDF." });
     }
 
-    // 🔥 NEW: Structured Data Lane Classification
-    const contentType = await aiService.classifyContent(text);
-    console.log(`Content classification for ${fileName}: ${contentType} (Source: ${source})`);
+    // 🔥 NEW: Deep Metadata Classification
+    const metadata = await aiService.classifyContent(text);
+    console.log(`Metadata for ${fileName}:`, metadata);
 
-    if (contentType === 'TABULAR' || subject === '__CALENDAR__') {
+    // If it's a calendar or the AI says TABULAR, route to vision lane
+    if (metadata.contentType === 'TABULAR' || subject === '__CALENDAR__') {
        console.log("➡️ Routing to Direct-to-VLM Structured Lane...");
        
        try {
@@ -125,7 +126,10 @@ router.post('/upload', authenticateAdmin, upload.single('pdfFile'), async (req, 
              chunk_type: "text",
              embedding: await aiService.getEmbedding(`Calendar file: ${fileName}`, "passage")
            }];
-           await storageService.addFile(subject, fileName, summaryChunk);
+           await storageService.addFile(subject, fileName, summaryChunk, metadata);
+
+           // Also upload raw file for viewing
+           await storageService.uploadRawFile(fileName, req.file.buffer, subject, metadata);
 
            return res.json({ 
              message: "PDF processed via Direct-to-VLM Lane", 
@@ -134,21 +138,12 @@ router.post('/upload', authenticateAdmin, upload.single('pdfFile'), async (req, 
              method: "gemma_3_vision"
            });
          }
-         console.log("⚠️ VLM extracted 0 events. Falling back to RAG.");
        } catch (vlmError) {
          console.error("❌ Direct-to-VLM Lane Failed:", vlmError);
-         console.log("⚠️ Falling back to standard RAG pipeline.");
        }
     }
 
     const chunks = pdfService.chunkText(text);
-    
-    if (chunks.length === 0) {
-       console.log("⚠️ No content extracted from PDF (even with OCR).");
-    } else {
-       console.log(`✅ Extracted ${chunks.length} chunks from ${fileName}.`);
-    }
-    
     const texts = chunks.map(c => c.text);
     const embeddings = await aiService.getEmbeddings(texts, "passage");
     
@@ -157,11 +152,14 @@ router.post('/upload', authenticateAdmin, upload.single('pdfFile'), async (req, 
       embedding: embeddings[i]
     }));
 
-    await storageService.addFile(subject, fileName, chunksWithEmbeds);
+    // Attach metadata to storage calls
+    await storageService.uploadRawFile(fileName, req.file.buffer, subject, metadata);
+    await storageService.addFile(subject, fileName, chunksWithEmbeds, metadata);
+
     res.json({ 
       message: chunks.length > 0 ? "PDF processed successfully" : "⚠️ Success, but no readable text found.", 
       chunks: chunks.length,
-      warning: chunks.length === 0 ? "Empty content" : null
+      metadata: metadata
     });
   } catch (error) {
     console.error("Upload Error:", error);
@@ -296,31 +294,73 @@ router.post('/query', async (req, res) => {
 
     // TIER 3: Standard Academic Search (Only if context is still empty or not purely a calendar query)
     if (finalContext.includes("No specific lecture notes")) {
-        // Use raw question directly for embedding — no LLM expansion needed
+        // 🔥 NEW: Extract user intent filters (e.g., "Module 3" or "Question Bank")
+        const queryMeta = await aiService.extractQueryMetadata(question);
+        console.log("Query Filters Detected:", queryMeta);
+
         const queryEmbedding = await aiService.getEmbedding(question, "query");
         const searchSubjects = subject ? [subject, '__CALENDAR__'] : ['__CALENDAR__'];
         const allChunks = await storageService.getAllChunks(searchSubjects);
         
         if (allChunks.length > 0) {
           const keywords = question.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+          
           const scoredChunks = allChunks.map(c => {
             const semanticScore = cosineSimilarity(queryEmbedding, c.embedding);
             const isCalendarChunk = c.subject === '__CALENDAR__';
             
+            // 🔥 METADATA BOOSTING
+            let metaBoost = 0;
+            if (queryMeta.targetModule && c.module_number === queryMeta.targetModule) {
+                metaBoost += 0.25; // Massive boost for requested module
+            }
+            if (queryMeta.targetDocType && c.doc_type === queryMeta.targetDocType) {
+                metaBoost += 0.20; // Massive boost for requested doc type (QB/Model Paper)
+            }
+
             let keywordMatches = 0;
             const textLower = c.text.toLowerCase();
             keywords.forEach(kw => { if (textLower.includes(kw)) keywordMatches += 0.05; });
 
-            const finalScore = semanticScore + Math.min(keywordMatches, 0.15) + (isCalendarChunk ? 0.12 : 0);
+            const finalScore = semanticScore + Math.min(keywordMatches, 0.15) + (isCalendarChunk ? 0.12 : 0) + metaBoost;
             return { ...c, score: finalScore };
           });
 
+          // Sort by score
           scoredChunks.sort((a, b) => b.score - a.score);
-          const topChunks = scoredChunks.filter(c => c.score > 0.35).slice(0, 15);
+
+          // 🔥 LOOSE FILTERING / TOP-UP LOGIC
+          // 1. First, take only the strong matches that hit the metadata target
+          let primaryChunks = scoredChunks.filter(c => {
+              const matchesModule = queryMeta.targetModule ? c.module_number === queryMeta.targetModule : true;
+              const matchesType = queryMeta.targetDocType ? c.doc_type === queryMeta.targetDocType : true;
+              return matchesModule && matchesType && c.score > 0.35;
+          });
+
+          // 2. If we found fewer than 5 high-quality matches, "Top-up" with general subject chunks
+          let finalSelection = [...primaryChunks];
+          if (finalSelection.length < 5) {
+              const secondaryChunks = scoredChunks.filter(c => 
+                  !primaryChunks.some(pc => pc.content === c.content) && c.score > 0.35
+              ).slice(0, 5 - finalSelection.length);
+              finalSelection.push(...secondaryChunks);
+          }
+
+          // Limit to max 15 chunks for context window safety
+          let topChunks = finalSelection.slice(0, 15);
+
+          // 🔥 Step 5: Context Window Quality Filter
+          // Remove any tiny cleaning survivors (< 100 chars)
+          const filteredChunks = topChunks.filter(c => c.text.length > 100);
+          
+          // Safety Switch: If filtering kills too much context, keep the originals
+          if (filteredChunks.length >= 5) {
+              topChunks = filteredChunks;
+          }
 
           if (topChunks.length > 0) {
-            console.log(`✅ Injecting ${topChunks.length} chunks via Vector Search.`);
-            finalContext = topChunks.map(c => `[${c.file_name}] ${c.text}`).join('\n---\n');
+            console.log(`✅ Injecting ${topChunks.length} chunks (Primary: ${primaryChunks.length}). Filters: M=${queryMeta.targetModule}, T=${queryMeta.targetDocType}`);
+            finalContext = topChunks.map(c => `[${c.file_name}${c.page_number ? ' p.' + c.page_number : ''}] ${c.text}`).join('\n---\n');
             
             // Extract unique filenames for RAG source links
             const uniqueNames = [...new Set(topChunks.map(c => c.file_name).filter(n => n))];
