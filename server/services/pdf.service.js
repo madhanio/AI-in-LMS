@@ -133,7 +133,7 @@ export class PdfService {
   /**
    * Splits text into overlapping chunks and extracts metadata
    */
-  chunkText(text, size = 1000, overlap = 200) {
+  chunkText(text, size = 2500, overlap = 500) {
     if (!text) {
       console.log("⚠️ chunkText received empty/undefined text. Skipping.");
       return [];

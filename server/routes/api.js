@@ -307,7 +307,7 @@ router.post('/query', async (req, res) => {
           });
 
           scoredChunks.sort((a, b) => b.score - a.score);
-          const topChunks = scoredChunks.filter(c => c.score > 0.42).slice(0, 5);
+          const topChunks = scoredChunks.filter(c => c.score > 0.35).slice(0, 15);
 
           if (topChunks.length > 0) {
             console.log(`✅ Injecting ${topChunks.length} chunks via Vector Search.`);
