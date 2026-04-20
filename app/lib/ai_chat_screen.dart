@@ -176,10 +176,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                         
                         // Extra widgets (Typing or Suggestions)
                         if (isTyping && index == messages.length) {
-                          return const Row(
-                            mainAxisAlignment: MainAxisAlignment.start,
-                            children: [TypingIndicator()],
-                          );
+                          return const TypingIndicator();
                         }
 
                         if (showSuggestions) {

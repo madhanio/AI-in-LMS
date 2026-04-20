@@ -47,7 +47,7 @@ class SubjectChipRow extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: isSelected ? const Color(0xFFF98012) : Colors.white,
                   border: Border.all(
-                    color: isSelected ? const Color(0xFFF98012) : const Color(0xFFE5E5EA),
+                    color: isSelected ? const Color(0xFFF98012) : const Color(0xFFD1D1D6),
                   ),
                   borderRadius: BorderRadius.circular(20),
                 ),

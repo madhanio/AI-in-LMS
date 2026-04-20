@@ -12,6 +12,31 @@ class MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (message.isSystemSwitch) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF2F2F7),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              message.text.replaceAll('📘 ', '').replaceAll('**', ''),
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                color: const Color(0xFF8E8E93),
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Align(
       alignment: message.isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Row(
@@ -48,7 +73,7 @@ class MessageBubble extends StatelessWidget {
                   margin: const EdgeInsets.symmetric(vertical: 2),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   constraints: BoxConstraints(
-                    maxWidth: MediaQuery.of(context).size.width * 0.75,
+                    maxWidth: MediaQuery.of(context).size.width * (message.isUser ? 0.75 : 0.85),
                   ),
                   decoration: BoxDecoration(
                     color: message.isUser ? const Color(0xFFFF8C00) : const Color(0xFFFFFFFF),
@@ -110,8 +135,8 @@ class MessageBubble extends StatelessWidget {
                   child: Text(
                     DateFormat('hh:mm a').format(message.createdAt),
                     style: GoogleFonts.inter(
-                      color: Colors.grey.shade400,
-                      fontSize: 10,
+                      color: Colors.grey.shade500,
+                      fontSize: 11,
                     ),
                   ),
                 ),
