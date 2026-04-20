@@ -10,8 +10,8 @@ class SubjectChipRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final chatProvider = context.watch<ChatProvider>();
     
-    // 🎭 ANIMATED SKELETON LOADER: Perfectly looping pulse for that premium feel
-    if (chatProvider.isLoadingSubjects) {
+    // 🎭 ANIMATED SKELETON LOADER: Show while subjects are empty/loading
+    if (chatProvider.subjects.isEmpty) {
       return Container(
         height: 50,
         padding: const EdgeInsets.symmetric(vertical: 8),
@@ -23,8 +23,6 @@ class SubjectChipRow extends StatelessWidget {
         ),
       );
     }
-
-    if (chatProvider.subjects.isEmpty) return const SizedBox.shrink();
     
     // ... rest of the build method ...
 
