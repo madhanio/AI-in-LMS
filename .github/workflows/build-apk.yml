@@ -28,16 +28,27 @@ jobs:
         working-directory: app
 
       - name: Build Release APK
-        run: flutter build apk --release
+        run: flutter build apk --release --no-tree-shake-icons
         working-directory: app
 
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: app/build/app/outputs/flutter-apk/app-release.apk
+
       - name: Notify Discord
-        if: success()
+        if: always()
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
           APK_PATH=$(find app/build/app/outputs/flutter-apk -name "*.apk" | head -n 1)
           
+          if [ -z "$DISCORD_WEBHOOK" ]; then
+            echo "⚠️ DISCORD_WEBHOOK_URL is not set. Skipping notification."
+            exit 0
+          fi
+
           # Attempt to upload the file directly to Discord
           curl -H "Content-Type: multipart/form-data" \
           -F "username=Misa's Factory" \
