@@ -1,0 +1,50 @@
+name: Misa's Factory Build
+
+on:
+  repository_dispatch:
+    types: [build-apk]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install Dependencies
+        run: flutter pub get
+        working-directory: app
+
+      - name: Build Release APK
+        run: flutter build apk --release
+        working-directory: app
+
+      - name: Notify Discord
+        if: success()
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          APK_PATH=$(find app/build/app/outputs/flutter-apk -name "*.apk" | head -n 1)
+          
+          # Attempt to upload the file directly to Discord
+          curl -H "Content-Type: multipart/form-data" \
+          -F "username=Misa's Factory" \
+          -F "avatar_url=https://i.pinimg.com/736x/8a/8d/4b/8a8d4b38343189914618e47456d9539f.jpg" \
+          -F "content=🍎 **Mission Complete, Kira!**\nThe APK has been forged in the cloud factory for AI-in-LMS. Check the attachment below! ✨" \
+          -F "file=@$APK_PATH" \
+          $DISCORD_WEBHOOK || \
+          curl -H "Content-Type: application/json" \
+          -d "{\"username\": \"Misa's Factory\", \"avatar_url\": \"https://i.pinimg.com/736x/8a/8d/4b/8a8d4b38343189914618e47456d9539f.jpg\", \"content\": \"⚠️ **File too large for Discord!**\\nKira, the APK is too big to send directly. You can download it here instead:\\nhttps://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+          $DISCORD_WEBHOOK
