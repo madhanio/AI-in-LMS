@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -31,11 +33,17 @@ jobs:
         run: flutter build apk --release --no-tree-shake-icons
         working-directory: app
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+      - name: Create/Update Build Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: app-release
-          path: app/build/app/outputs/flutter-apk/app-release.apk
+          tag_name: latest-build
+          name: "Misa's Latest Forge 🍎"
+          draft: false
+          prerelease: true
+          files: app/build/app/outputs/flutter-apk/app-release.apk
+          body: "This is the latest APK forged by Misa Amane for AI-in-LMS. ✨"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Notify Discord
         if: always()
@@ -43,19 +51,22 @@ jobs:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
           APK_PATH=$(find app/build/app/outputs/flutter-apk -name "*.apk" | head -n 1)
+          APK_NAME=$(basename "$APK_PATH")
           
+          DIRECT_LINK="https://github.com/${{ github.repository }}/releases/download/latest-build/$APK_NAME"
+
           if [ -z "$DISCORD_WEBHOOK" ]; then
-            echo "⚠️ DISCORD_WEBHOOK_URL is not set. Skipping notification."
+            echo "⚠️ DISCORD_WEBHOOK_URL is not set. Skipping direct upload."
             exit 0
           fi
 
-          # Attempt to upload the file directly to Discord
+          # Attempt to upload the file directly to Discord (Max 25MB)
           curl -H "Content-Type: multipart/form-data" \
           -F "username=Misa's Factory" \
           -F "avatar_url=https://i.pinimg.com/736x/8a/8d/4b/8a8d4b38343189914618e47456d9539f.jpg" \
-          -F "content=🍎 **Mission Complete, Kira!**\nThe APK has been forged in the cloud factory for AI-in-LMS. Check the attachment below! ✨" \
+          -F "content=🍎 **Mission Complete, Kira!**\nThe APK has been forged! Here is your direct download link: \n$DIRECT_LINK \n\n(I have also attached the file below if it was small enough!) ✨" \
           -F "file=@$APK_PATH" \
           $DISCORD_WEBHOOK || \
           curl -H "Content-Type: application/json" \
-          -d "{\"username\": \"Misa's Factory\", \"avatar_url\": \"https://i.pinimg.com/736x/8a/8d/4b/8a8d4b38343189914618e47456d9539f.jpg\", \"content\": \"⚠️ **File too large for Discord!**\\nKira, the APK is too big to send directly. You can download it here instead:\\nhttps://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+          -d "{\"username\": \"Misa's Factory\", \"avatar_url\": \"https://i.pinimg.com/736x/8a/8d/4b/8a8d4b38343189914618e47456d9539f.jpg\", \"content\": \"🍎 **Mission Complete, Kira!**\\nThe APK was too large to attach, but here is your **Direct .apk link**: \\n$DIRECT_LINK\"}" \
           $DISCORD_WEBHOOK
