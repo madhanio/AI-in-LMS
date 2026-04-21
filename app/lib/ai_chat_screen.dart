@@ -19,6 +19,14 @@ class AiChatScreen extends StatefulWidget {
 class _AiChatScreenState extends State<AiChatScreen> {
   final ScrollController _scrollController = ScrollController();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final TextEditingController _suggestionController = TextEditingController();
+
+  final Map<String, List<String>> _subjectSuggestions = {
+    "CN": ["Explain OSI Model", "Quiz me on TCP/IP", "Summarize Unit 3"],
+    "DS": ["Explain overfitting", "What is a confusion matrix?", "Explain linear regression"],
+    "SE": ["Explain SDLC models", "What is UML?", "Describe Agile sprint"],
+    "OS": ["What is deadlock?", "Explain page replacement", "CPU scheduling algorithms"],
+  };
 
   @override
   void initState() {
@@ -38,6 +46,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _suggestionController.dispose();
     super.dispose();
   }
 
@@ -126,6 +135,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
               return Column(
                 children: [
+                  const SubjectChipRow(),
                   Expanded(
                     child: ListView.builder(
                       controller: _scrollController,
@@ -189,8 +199,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
                       },
                     ),
                   ),
-                  const SubjectChipRow(),
-                  const InputBar(),
+                  _buildSuggestionChips(chatProvider),
+                  InputBar(controller: _suggestionController),
                 ],
               );
             },
@@ -198,5 +208,56 @@ class _AiChatScreenState extends State<AiChatScreen> {
         ),
         resizeToAvoidBottomInset: true,
       );
+  }
+
+  Widget _buildSuggestionChips(ChatProvider chatProvider) {
+    String? currentKey;
+    if (chatProvider.selectedSubject != null) {
+      final parts = chatProvider.selectedSubject!.split('(');
+      if (parts.length > 1) {
+        currentKey = parts.last.replaceAll(')', '');
+      }
+    }
+
+    final suggestions = _subjectSuggestions[currentKey] ?? [];
+    if (suggestions.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      height: 48,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          children: suggestions.map((text) {
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: InkWell(
+                onTap: () {
+                  _suggestionController.text = text;
+                  chatProvider.sendMessage(text);
+                  _suggestionController.clear();
+                },
+                borderRadius: BorderRadius.circular(99),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(99),
+                    border: Border.all(color: Colors.grey.shade700, width: 0.5),
+                    color: Colors.transparent,
+                  ),
+                  child: Text(
+                    text,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: Colors.grey.shade400,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
   }
 }

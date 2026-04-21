@@ -4,14 +4,21 @@ import 'package:google_fonts/google_fonts.dart';
 import '../providers/chat_provider.dart';
 
 class InputBar extends StatefulWidget {
-  const InputBar({super.key});
+  final TextEditingController? controller;
+  const InputBar({super.key, this.controller});
 
   @override
   State<InputBar> createState() => _InputBarState();
 }
 
 class _InputBarState extends State<InputBar> {
-  final TextEditingController _controller = TextEditingController();
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = widget.controller ?? TextEditingController();
+  }
 
   void _handleSend(ChatProvider provider) {
     final text = _controller.text.trim();
@@ -23,7 +30,9 @@ class _InputBarState extends State<InputBar> {
 
   @override
   void dispose() {
-    _controller.dispose();
+    if (widget.controller == null) {
+      _controller.dispose();
+    }
     super.dispose();
   }
 
