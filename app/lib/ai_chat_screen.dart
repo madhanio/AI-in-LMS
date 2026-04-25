@@ -88,7 +88,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   const Icon(Icons.school, color: Color(0xFFF98012), size: 20),
                   const SizedBox(width: 8),
                   Text(
-                    'Academic Mentor',
+                    'AcademicCore',
                     style: GoogleFonts.inter(
                       color: const Color(0xFF1C1C1E),
                       fontWeight: FontWeight.w800,

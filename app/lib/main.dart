@@ -33,7 +33,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Moodle AI',
+      title: 'AcademicCore',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -83,8 +83,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         backgroundColor: Colors.white,
         elevation: 0,
         title: const Text(
-          'Hyderabad Institute of ...',
-          style: const TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.normal),
+          'AcademicCore',
+          style: const TextStyle(color: Colors.black, fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -0.5),
         ),
         actions: [
           IconButton(
@@ -166,16 +166,44 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AiChatScreen()),
-          );
-        },
-        backgroundColor: const Color(0xFFF98012),
-        tooltip: 'AI Assistant',
-        child: const Icon(Icons.smart_toy, color: Colors.white),
+      floatingActionButton: Container(
+        height: 65,
+        width: 65,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: const LinearGradient(
+            colors: [Color(0xFFF98012), Color(0xFFFF4D00)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFF98012).withValues(alpha: 0.4),
+              blurRadius: 15,
+              spreadRadius: 2,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AiChatScreen()),
+              );
+            },
+            child: const Center(
+              child: Icon(
+                Icons.auto_awesome, 
+                color: Colors.white, 
+                size: 32,
+              ),
+            ),
+          ),
+        ),
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
