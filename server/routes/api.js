@@ -370,7 +370,12 @@ router.post('/query', async (req, res) => {
             // Since our search (scoredChunks) is already restricted to the selected subject 
             // and the global calendar, we can trust these sources are contextually appropriate.
             if (topChunks.length > 0) {
-              const uniqueNames = [...new Set(topChunks.map(c => c.file_name).filter(n => n))];
+              const uniqueNames = [...new Set(
+                topChunks
+                  .filter(c => c.doc_type !== 'QUESTION_BANK')
+                  .map(c => c.file_name)
+                  .filter(n => n)
+              )];
               req.sourceUrls = await storageService.getFileUrls(uniqueNames);
             } else {
               req.sourceUrls = {}; 

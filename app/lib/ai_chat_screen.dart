@@ -22,11 +22,16 @@ class _AiChatScreenState extends State<AiChatScreen> {
   final TextEditingController _suggestionController = TextEditingController();
 
   final Map<String, List<String>> _subjectSuggestions = {
-    "__general__": ["What's on my study schedule? 📅", "Summarize my syllabus 📄", "Give me an exam tip 💡", "How many modules in total? 📚"],
+    "__general__": ["Help me with a study plan 📅", "Summarize my recent notes 📄", "Give me a surprise quiz 🧠", "Analyze my academic progress 📈"],
     "CN": ["Explain OSI Model Layers", "Quiz me on TCP/UDP", "Summarize Unit 3"],
     "Computer Network": ["Explain OSI Model Layers", "Quiz me on TCP/UDP", "Summarize Unit 3"],
     "DS": ["Explain Data Structures", "What is Big O?", "Summarize Module 2"],
-    "Data Structures": ["Explain Data Structures", "What is Big O?", "Summarize Module 2"],
+    "Data Science": ["Explain Regression vs Classification", "What is Overfitting?", "Summarize Module 1"],
+    "Introduction to Data Science": ["Explain Regression vs Classification", "What is Overfitting?", "Summarize Module 1"],
+    "SMF": ["Explain Probability Distributions", "What is Linear Algebra in DS?", "Summarize Unit 4"],
+    "Statistical Mathematical Foundation": ["Explain Probability Distributions", "What is Linear Algebra in DS?", "Summarize Unit 4"],
+    "COI": ["Explain Fundamental Rights", "Preamble of the Constitution", "Summarize Module 5"],
+    "Constitution of India": ["Explain Fundamental Rights", "Preamble of the Constitution", "Summarize Module 5"],
     "SE": ["What is SDLC?", "Explain UML Diagrams", "Agile vs Waterfall"],
     "Software Engineering": ["What is SDLC?", "Explain UML Diagrams", "Agile vs Waterfall"],
     "OS": ["What is Deadlock?", "Explain Paging", "CPU Scheduling Quiz"],

@@ -103,33 +103,35 @@ class MessageBubble extends StatelessWidget {
                         ),
                     ],
                   ),
-                  child: message.isUser
-                    ? Text(
-                        message.text,
-                        style: GoogleFonts.inter(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      )
-                    : MarkdownBody(
-                        data: message.text,
-                        styleSheet: MarkdownStyleSheet(
-                          h3: GoogleFonts.inter(
-                            color: const Color(0xFFFF8C00),
-                            fontWeight: FontWeight.w700,
-                          ),
-                          strong: GoogleFonts.inter(
-                            color: const Color(0xFF1C1C1E),
-                            fontWeight: FontWeight.w600,
-                          ),
-                          p: GoogleFonts.inter(
-                            color: const Color(0xFF3C3C43),
+                  child: SelectionArea(
+                    child: message.isUser
+                      ? Text(
+                          message.text,
+                          style: GoogleFonts.inter(
+                            color: Colors.white,
                             fontSize: 15,
-                            height: 1.6,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        )
+                      : MarkdownBody(
+                          data: message.text,
+                          styleSheet: MarkdownStyleSheet(
+                            h3: GoogleFonts.inter(
+                              color: const Color(0xFFFF8C00),
+                              fontWeight: FontWeight.w700,
+                            ),
+                            strong: GoogleFonts.inter(
+                              color: const Color(0xFF1C1C1E),
+                              fontWeight: FontWeight.w600,
+                            ),
+                            p: GoogleFonts.inter(
+                              color: const Color(0xFF3C3C43),
+                              fontSize: 15,
+                              height: 1.6,
+                            ),
                           ),
                         ),
-                      ),
+                  ),
                 ),
                 Padding(
                   padding: const EdgeInsets.only(bottom: 4, left: 4, right: 4),
