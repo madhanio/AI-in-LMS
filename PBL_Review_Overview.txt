@@ -1,0 +1,42 @@
+================================================================================
+ACADEMICCORE AI - PBL REVIEW 2 OVERVIEW
+================================================================================
+
+1. PROJECT IDENTITY & DOMAIN
+----------------------------
+Project Title: AcademicCore AI (Specialized LMS Assistant)
+Domain: Artificial Intelligence (AI) - Specialized Chatbot
+Goal: A "Syllabus Expert" providing grounded, accurate academic answers.
+
+2. TECHNICAL ARCHITECTURE
+-------------------------
+Frontend: Cross-platform Flutter Mobile App.
+Backend: Node.js (Express) Server.
+Database: Supabase (PostgreSQL + pgvector).
+AI Engine: NVIDIA AI Foundation (Mistral/Llama series) using RAG.
+
+3. THE AI "TRAINING" LOGIC (RAG PIPELINE)
+-----------------------------------------
+The AI uses Retrieval-Augmented Generation (RAG):
+- Processing: PDFs/Word docs processed at 150 DPI for efficiency.
+- Retrieval: Vectors search for top 15 chunks based on context.
+- Grounding: AI is forced to answer ONLY from the context (Scoring > 0.35).
+
+4. NUMERICAL OPTIMIZATIONS & STATS
+----------------------------------
+- RAM Usage: Optimized to fit within 512MB (Render Free Tier).
+- Heap Limit: Manually boosted to 450MB in package.json.
+- Keep-Alive: 14-minute Heartbeat Cron Job for 24/7 availability.
+- Search Speed: Context retrieval in < 200ms.
+- Model Precision: Quiz mode presents exactly 1 question at a time.
+
+5. KEY BREAKTHROUGHS
+--------------------
+- Source Chips: Clickable links reveal exactly where the AI got the answer.
+- Admin Panel: Full control over Subjects with cascading DB updates.
+- Selectable Text: Users can long-press to copy any part of the chat.
+- Intent Detection: AI differentiates between "Question Banks" and "Modules".
+
+================================================================================
+PREPARED FOR HITAM PBL REVIEW 2
+================================================================================
