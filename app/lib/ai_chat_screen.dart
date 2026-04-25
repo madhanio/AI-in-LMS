@@ -24,10 +24,16 @@ class _AiChatScreenState extends State<AiChatScreen> {
   final Map<String, List<String>> _subjectSuggestions = {
     "__general__": ["What's on my study schedule? 📅", "Summarize my syllabus 📄", "Give me an exam tip 💡", "How many modules in total? 📚"],
     "CN": ["Explain OSI Model Layers", "Quiz me on TCP/UDP", "Summarize Unit 3"],
+    "Computer Network": ["Explain OSI Model Layers", "Quiz me on TCP/UDP", "Summarize Unit 3"],
     "DS": ["Explain Data Structures", "What is Big O?", "Summarize Module 2"],
+    "Data Structures": ["Explain Data Structures", "What is Big O?", "Summarize Module 2"],
     "SE": ["What is SDLC?", "Explain UML Diagrams", "Agile vs Waterfall"],
+    "Software Engineering": ["What is SDLC?", "Explain UML Diagrams", "Agile vs Waterfall"],
     "OS": ["What is Deadlock?", "Explain Paging", "CPU Scheduling Quiz"],
+    "Operating Systems": ["What is Deadlock?", "Explain Paging", "CPU Scheduling Quiz"],
     "OOPJ": ["Explain Java Inheritance", "What are JVM, JRE, JDK?", "Encapsulation vs Abstraction"],
+    "Object Oriented Programming": ["Explain Java Inheritance", "What are JVM, JRE, JDK?", "Encapsulation vs Abstraction"],
+    "Java": ["Explain Java Inheritance", "What are JVM, JRE, JDK?", "Encapsulation vs Abstraction"],
   };
 
   @override
