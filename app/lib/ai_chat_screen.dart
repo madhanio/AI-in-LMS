@@ -22,10 +22,12 @@ class _AiChatScreenState extends State<AiChatScreen> {
   final TextEditingController _suggestionController = TextEditingController();
 
   final Map<String, List<String>> _subjectSuggestions = {
-    "CN": ["Explain OSI Model", "Quiz me on TCP/IP", "Summarize Unit 3"],
-    "DS": ["Explain overfitting", "What is a confusion matrix?", "Explain linear regression"],
-    "SE": ["Explain SDLC models", "What is UML?", "Describe Agile sprint"],
-    "OS": ["What is deadlock?", "Explain page replacement", "CPU scheduling algorithms"],
+    "__general__": ["What's on my study schedule? 📅", "Summarize my syllabus 📄", "Give me an exam tip 💡", "How many modules in total? 📚"],
+    "CN": ["Explain OSI Model Layers", "Quiz me on TCP/UDP", "Summarize Unit 3"],
+    "DS": ["Explain Data Structures", "What is Big O?", "Summarize Module 2"],
+    "SE": ["What is SDLC?", "Explain UML Diagrams", "Agile vs Waterfall"],
+    "OS": ["What is Deadlock?", "Explain Paging", "CPU Scheduling Quiz"],
+    "OOPJ": ["Explain Java Inheritance", "What are JVM, JRE, JDK?", "Encapsulation vs Abstraction"],
   };
 
   @override
@@ -129,9 +131,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
               final messages = chatProvider.messages;
               final isTyping = chatProvider.isTyping;
-              // 🧠 SMART UI: Only show suggestions for first-time rookies (Empty Messages + Empty History)
-              final showSuggestions = messages.isEmpty && chatProvider.history.isEmpty && !isTyping;
-              final extraWidgets = (isTyping ? 1 : 0) + (showSuggestions ? 1 : 0);
+              // 🧠 SMART UI: Only show suggestion CARDS for first-run empty void
+              final showSuggestionCards = messages.isEmpty && chatProvider.history.isEmpty && !isTyping;
+              final extraWidgets = (isTyping ? 1 : 0) + (showSuggestionCards ? 1 : 0);
 
               return Column(
                 children: [
@@ -142,46 +144,21 @@ class _AiChatScreenState extends State<AiChatScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                       itemCount: messages.length + extraWidgets,
                       itemBuilder: (context, index) {
-                        // ✨ EMPTY STATE: Fill the 'Grey Void' with helpful context
-                        if (messages.isEmpty && !isTyping) {
-                           return Container(
-                             height: MediaQuery.of(context).size.height * 0.5,
-                             alignment: Alignment.center,
-                             child: Column(
-                               mainAxisAlignment: MainAxisAlignment.center,
-                               children: [
-                                 Container(
-                                   padding: const EdgeInsets.all(24),
-                                   decoration: BoxDecoration(
-                                     color: const Color(0xFFF98012).withOpacity(0.05),
-                                     shape: BoxShape.circle,
-                                   ),
-                                   child: const Icon(Icons.auto_stories_outlined, size: 64, color: Color(0xFFF98012)),
-                                 ),
-                                 const SizedBox(height: 24),
-                                 Text(
-                                   'Ask anything from your syllabus',
-                                   style: GoogleFonts.inter(
-                                     fontSize: 18,
-                                     fontWeight: FontWeight.w600,
-                                     color: const Color(0xFF1C1C1E),
-                                   ),
-                                 ),
-                                 const SizedBox(height: 8),
-                                 Text(
-                                   'Get instant answers, summaries, and exam tips',
-                                   style: GoogleFonts.inter(
-                                     fontSize: 14,
-                                     color: Colors.grey.shade500,
-                                   ),
-                                 ),
-                               ],
-                             ),
-                           );
-                        }
-
                         if (index < messages.length) {
-                          return MessageBubble(message: messages[index]);
+                          final bubble = MessageBubble(message: messages[index]);
+                          
+                          // If this is the welcome message (index 0) and we have no other history
+                          // inject the empty state illustration right below it
+                          if (index == 0 && messages.length <= 1 && !isTyping) {
+                             return Column(
+                               children: [
+                                 bubble,
+                                 const SizedBox(height: 40),
+                                 _buildEmptyState(chatProvider.selectedSubject),
+                               ],
+                             );
+                          }
+                          return bubble;
                         }
                         
                         // Extra widgets (Typing or Suggestions)
@@ -189,7 +166,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                           return const TypingIndicator();
                         }
 
-                        if (showSuggestions) {
+                        if (showSuggestionCards) {
                           return SuggestionCards(
                             onSelect: (prompt) => chatProvider.sendMessage(prompt),
                           );
@@ -210,16 +187,50 @@ class _AiChatScreenState extends State<AiChatScreen> {
       );
   }
 
+  Widget _buildEmptyState(String? subject) {
+    return Center(
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.grey.withOpacity(0.04),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.auto_awesome_outlined, size: 40, color: Colors.grey.shade400),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            subject != null ? 'Ask anything about $subject 📚' : 'Select a subject to start learning 🎓',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: Colors.grey.shade500,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSuggestionChips(ChatProvider chatProvider) {
-    String? currentKey;
+    List<String> suggestions = [];
+    
     if (chatProvider.selectedSubject != null) {
+      // Find matching subject key (e.g., from "Operating Systems (OS)" -> "OS")
+      String currentKey = "";
       final parts = chatProvider.selectedSubject!.split('(');
       if (parts.length > 1) {
-        currentKey = parts.last.replaceAll(')', '');
+        currentKey = parts.last.replaceAll(')', '').trim();
+      } else {
+        currentKey = chatProvider.selectedSubject!.trim();
       }
+      suggestions = _subjectSuggestions[currentKey] ?? [];
+    } else {
+      // General suggestions when no subject is selected
+      suggestions = _subjectSuggestions["__general__"] ?? [];
     }
 
-    final suggestions = _subjectSuggestions[currentKey] ?? [];
     if (suggestions.isEmpty) return const SizedBox.shrink();
 
     return Container(
@@ -233,23 +244,28 @@ class _AiChatScreenState extends State<AiChatScreen> {
               padding: const EdgeInsets.only(right: 8),
               child: InkWell(
                 onTap: () {
-                  _suggestionController.text = text;
                   chatProvider.sendMessage(text);
-                  _suggestionController.clear();
                 },
                 borderRadius: BorderRadius.circular(99),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(99),
-                    border: Border.all(color: Colors.grey.shade700, width: 0.5),
-                    color: Colors.transparent,
+                    border: Border.all(color: Colors.grey.shade200, width: 1),
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.02),
+                        blurRadius: 4,
+                      )
+                    ]
                   ),
                   child: Text(
                     text,
                     style: GoogleFonts.inter(
                       fontSize: 12,
-                      color: Colors.grey.shade400,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade600,
                     ),
                   ),
                 ),

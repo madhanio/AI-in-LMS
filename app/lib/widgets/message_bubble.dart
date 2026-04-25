@@ -19,16 +19,17 @@ class MessageBubble extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFFF2F2F7),
+              color: const Color(0xFFFFF3E0),
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFFFE0B2), width: 0.5),
             ),
             child: Text(
               message.text.replaceAll('📘 ', '').replaceAll('**', ''),
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
                 fontSize: 11,
-                color: const Color(0xFF8E8E93),
-                fontWeight: FontWeight.w500,
+                color: const Color(0xFFE65100),
+                fontWeight: FontWeight.w700,
                 letterSpacing: 0.2,
               ),
             ),
@@ -60,7 +61,7 @@ class MessageBubble extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(left: 4, bottom: 4),
                     child: Text(
-                      'Academic Mentor',
+                      'AcademicCore',
                       style: GoogleFonts.inter(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
@@ -73,7 +74,7 @@ class MessageBubble extends StatelessWidget {
                   margin: const EdgeInsets.symmetric(vertical: 2),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   constraints: BoxConstraints(
-                    maxWidth: MediaQuery.of(context).size.width * (message.isUser ? 0.75 : 0.85),
+                    maxWidth: MediaQuery.of(context).size.width * (message.isUser ? 0.75 : 0.78),
                   ),
                   decoration: BoxDecoration(
                     color: message.isUser ? const Color(0xFFFF8C00) : const Color(0xFFFFFFFF),
