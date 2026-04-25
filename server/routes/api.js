@@ -366,19 +366,14 @@ router.post('/query', async (req, res) => {
             finalContext = topChunks.map(c => `[${c.file_name}${c.page_number ? ' p.' + c.page_number : ''}] ${c.text}`).join('\n---\n');
             
             // 🔥 SOURCE CARD FILTERING
-            // Only show source cards if:
-            // 1. Text was actually found
-            // 2. Chunks belong to the selected subject or are important calendar events
-            const relevantChunksForSources = topChunks.filter(c => {
-               if (!subject) return true; // Global search: show all
-               return c.subject === subject; // Subject-specific: only show cards for that subject
-            });
-
-            if (relevantChunksForSources.length > 0) {
-              const uniqueNames = [...new Set(relevantChunksForSources.map(c => c.file_name).filter(n => n))];
+            // We only show source cards if we actually found something relevant.
+            // Since our search (scoredChunks) is already restricted to the selected subject 
+            // and the global calendar, we can trust these sources are contextually appropriate.
+            if (topChunks.length > 0) {
+              const uniqueNames = [...new Set(topChunks.map(c => c.file_name).filter(n => n))];
               req.sourceUrls = await storageService.getFileUrls(uniqueNames);
             } else {
-              req.sourceUrls = {}; // Suppress source cards if not matching selected subject
+              req.sourceUrls = {}; 
             }
           }
         }
