@@ -69,7 +69,11 @@ export class PdfService {
    * Extracts text from .docx using mammoth with HTML-to-Markdown table preservation
    */
   async docxToText(buffer) {
-    const result = await mammoth.convertToHtml({ buffer });
+    // 🛡️ Memory Safety: Ignore images in DOCX to prevent massive base64 bloating
+    const options = {
+      convertImage: () => ({}) // Returns empty object to skip image tags
+    };
+    const result = await mammoth.convertToHtml({ buffer }, options);
     let html = result.value || "";
     return this.htmlToMarkdown(html);
   }
@@ -391,18 +395,19 @@ export class PdfService {
    */
   async convertToImages(buffer) {
     try {
-      const density = 300;
-      const width = 2480;
+      // 🛡️ Optimization: Reducing DPI from 300 to 150 reduces memory usage by 4x.
+      // 150 DPI is more than enough for VLM tables/text extraction.
+      const density = 150; 
+      const width = 1240; // Proportional to density
       
-      console.log(`📸 Converting PDF to high-quality images (Width: ${width}px, Density: ${density}DPI)...`);
+      console.log(`📸 Converting PDF to optimized images (Width: ${width}px, Density: ${density}DPI)...`);
       
-      // pdf-img-convert returns an array of Uint8Arrays
       const images = await pdfConverter.convert(buffer, {
         width: width,
         density: density,
       });
       
-      console.log(`✅ Converted ${images.length} pages at 300 DPI.`);
+      console.log(`✅ Converted ${images.length} pages.`);
       return images.map(img => Buffer.from(img).toString("base64"));
     } catch (error) {
       console.error("❌ PDF-to-Image Conversion Failed:", error);

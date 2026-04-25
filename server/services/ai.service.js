@@ -339,8 +339,14 @@ export class AiService {
           response_format: { type: "json_object" }
         })
       });
+      if (!response.ok) {
+        const errText = await response.text();
+        console.warn(`⚠️ Classification API returned ${response.status}: ${errText}`);
+        return { contentType: "TEXT", docType: "MODULE_RESOURCE", moduleNumber: null, partNumber: null };
+      }
+
       const data = await response.json();
-      const raw = data.choices[0]?.message?.content || "{}";
+      const raw = data.choices?.[0]?.message?.content || "{}";
       const meta = JSON.parse(this.cleanJsonResponse(raw));
       
       return {
@@ -350,7 +356,7 @@ export class AiService {
         partNumber: meta.partNumber || null
       };
     } catch (e) {
-      console.error("Deep Classification Error:", e);
+      console.error("Deep Classification Error:", e.message);
       return { contentType: "TEXT", docType: "MODULE_RESOURCE", moduleNumber: null, partNumber: null };
     }
   }
@@ -388,11 +394,17 @@ export class AiService {
           response_format: { type: "json_object" }
         })
       });
+      if (!response.ok) {
+        const errText = await response.text();
+        console.warn(`⚠️ Intent Filter API returned ${response.status}: ${errText}`);
+        return { targetDocType: null, targetModule: null };
+      }
+
       const data = await response.json();
-      const raw = data.choices[0]?.message?.content || "{}";
+      const raw = data.choices?.[0]?.message?.content || "{}";
       return JSON.parse(this.cleanJsonResponse(raw));
     } catch (e) {
-      console.error("Intent Filter Error:", e);
+      console.error("Intent Filter Error:", e.message);
       return { targetDocType: null, targetModule: null };
     }
   }

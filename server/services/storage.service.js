@@ -64,6 +64,39 @@ export class StorageService {
     return true;
   }
 
+  /**
+   * Rename a subject and update all related document references
+   */
+  async renameSubject(oldName, newName) {
+    if (!oldName || !newName || oldName === newName) return true;
+
+    // 1. Update the subject name in the 'subjects' table
+    const { error: subError } = await supabase
+      .from('subjects')
+      .update({ name: newName })
+      .eq('name', oldName);
+
+    if (subError) throw subError;
+
+    // 2. Cascade rename to 'documents' table
+    const { error: docError } = await supabase
+      .from('documents')
+      .update({ subject: newName })
+      .eq('subject', oldName);
+
+    if (docError) console.warn("Failed to update some document references:", docError);
+
+    // 3. Cascade rename to 'syllabus_files' table
+    const { error: sylError } = await supabase
+      .from('syllabus_files')
+      .update({ subject: newName })
+      .eq('subject', oldName);
+
+    if (sylError) console.warn("Failed to update some syllabus file references:", sylError);
+
+    return true;
+  }
+
   async getFiles() {
     // 1. Get all subject names
     const subjectList = await this.getSubjects();

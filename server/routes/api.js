@@ -365,9 +365,21 @@ router.post('/query', async (req, res) => {
             console.log(`✅ Injecting ${topChunks.length} chunks (Primary: ${primaryChunks.length}). Filters: M=${queryMeta.targetModule}, T=${queryMeta.targetDocType}`);
             finalContext = topChunks.map(c => `[${c.file_name}${c.page_number ? ' p.' + c.page_number : ''}] ${c.text}`).join('\n---\n');
             
-            // Extract unique filenames for RAG source links
-            const uniqueNames = [...new Set(topChunks.map(c => c.file_name).filter(n => n))];
-            req.sourceUrls = await storageService.getFileUrls(uniqueNames);
+            // 🔥 SOURCE CARD FILTERING
+            // Only show source cards if:
+            // 1. Text was actually found
+            // 2. Chunks belong to the selected subject or are important calendar events
+            const relevantChunksForSources = topChunks.filter(c => {
+               if (!subject) return true; // Global search: show all
+               return c.subject === subject; // Subject-specific: only show cards for that subject
+            });
+
+            if (relevantChunksForSources.length > 0) {
+              const uniqueNames = [...new Set(relevantChunksForSources.map(c => c.file_name).filter(n => n))];
+              req.sourceUrls = await storageService.getFileUrls(uniqueNames);
+            } else {
+              req.sourceUrls = {}; // Suppress source cards if not matching selected subject
+            }
           }
         }
     }
@@ -445,6 +457,23 @@ router.post('/subjects', authenticateAdmin, async (req, res) => {
     if (!name) return res.status(400).json({ error: "Subject name is required" });
     await storageService.addSubject(name);
     res.json({ message: "Subject added successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * PATCH /subjects/:oldName - Rename a subject
+ */
+router.patch('/subjects/:oldName', authenticateAdmin, async (req, res) => {
+  try {
+    const { oldName } = req.params;
+    const { newName } = req.body;
+    
+    if (!newName) return res.status(400).json({ error: "New subject name is required" });
+    
+    await storageService.renameSubject(oldName, newName);
+    res.json({ message: `Subject renamed to ${newName} successfully.` });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

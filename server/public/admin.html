@@ -704,7 +704,10 @@
                 subList.innerHTML += `
                     <div class="file-item">
                         <span class="file-name"><i data-lucide="layers" style="width: 14px; color: var(--primary)"></i> ${s}</span>
-                        <i data-lucide="trash-2" class="delete-btn" onclick="deleteSubject('${s}')"></i>
+                        <div class="action-row">
+                            <i data-lucide="edit-3" class="delete-btn" style="color: var(--text-dim)" onclick="editSubject('${s}')"></i>
+                            <i data-lucide="trash-2" class="delete-btn" onclick="deleteSubject('${s}')"></i>
+                        </div>
                     </div>
                 `;
                 select.innerHTML += `<option value="${s}">${s}</option>`;
@@ -789,6 +792,29 @@
                 loadData();
             } else {
                 showToast('❌ ' + data.error, true);
+            }
+        }
+
+        async function editSubject(oldName) {
+            const newName = prompt(`Rename module "${oldName}" to:`, oldName);
+            if (!newName || newName.trim() === "" || newName === oldName) return;
+
+            try {
+                const res = await fetch(`/api/subjects/${encodeURIComponent(oldName)}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ newName: newName.trim() })
+                });
+
+                if (res.ok) {
+                    showToast('📝 Module Renamed');
+                    loadData();
+                } else {
+                    const data = await res.json();
+                    showToast('❌ ' + (data.error || 'Rename failed'), true);
+                }
+            } catch (err) {
+                showToast('❌ Connection error during rename', true);
             }
         }
 

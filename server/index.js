@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 import apiRoutes from "./routes/api.js";
 import path from "path";
+import { initKeepAlive } from "./utils/keep_alive.js";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -35,7 +36,7 @@ app.get("/", (req, res) => {
   res.send("AI LMS Backend is running...");
 });
 
-const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  initKeepAlive();
 });
