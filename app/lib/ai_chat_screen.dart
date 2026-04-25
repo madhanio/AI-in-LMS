@@ -215,17 +215,30 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   Widget _buildSuggestionChips(ChatProvider chatProvider) {
     List<String> suggestions = [];
+    final selectedSubject = chatProvider.selectedSubject;
     
-    if (chatProvider.selectedSubject != null) {
-      // Find matching subject key (e.g., from "Operating Systems (OS)" -> "OS")
-      String currentKey = "";
-      final parts = chatProvider.selectedSubject!.split('(');
+    if (selectedSubject != null) {
+      // 1. Precise Match: Extract shorthand from parens (e.g., "Operating Systems (OS)" -> "OS")
+      String shorthand = "";
+      final parts = selectedSubject.split('(');
       if (parts.length > 1) {
-        currentKey = parts.last.replaceAll(')', '').trim();
-      } else {
-        currentKey = chatProvider.selectedSubject!.trim();
+        shorthand = parts.last.replaceAll(')', '').trim();
       }
-      suggestions = _subjectSuggestions[currentKey] ?? [];
+
+      // 2. Lookup logic: Priority -> Shorthand -> Full Name -> Sub-key match -> General
+      if (_subjectSuggestions.containsKey(shorthand)) {
+        suggestions = _subjectSuggestions[shorthand]!;
+      } else if (_subjectSuggestions.containsKey(selectedSubject.trim())) {
+        suggestions = _subjectSuggestions[selectedSubject.trim()]!;
+      } else {
+        // 3. Fallback: Check if any of our keys are contained in the subject name
+        // (Useful if the subject is "Course: Operating Systems")
+        final match = _subjectSuggestions.keys.firstWhere(
+          (k) => k != "__general__" && selectedSubject.toUpperCase().contains(k.toUpperCase()),
+          orElse: () => "__general__",
+        );
+        suggestions = _subjectSuggestions[match] ?? _subjectSuggestions["__general__"]!;
+      }
     } else {
       // General suggestions when no subject is selected
       suggestions = _subjectSuggestions["__general__"] ?? [];
