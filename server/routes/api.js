@@ -302,7 +302,18 @@ router.post('/query', async (req, res) => {
         console.log("Query Filters Detected:", queryMeta);
 
         const queryEmbedding = await aiService.getEmbedding(question, "query");
-        const searchSubjects = subject ? [subject, '__CALENDAR__'] : ['__CALENDAR__'];
+        
+        let searchSubjects = subject ? [subject, '__CALENDAR__'] : ['__CALENDAR__'];
+        
+        // 🔥 IMPROVED: If no subject is selected, search the global calendar AND a sample of all subjects
+        // to handle general queries like "Summarize my syllabus" or "What subjects do I have?"
+        if (!subject) {
+          const allSubjectNames = await storageService.getSubjects();
+          if (allSubjectNames && allSubjectNames.length > 0) {
+            searchSubjects = [...allSubjectNames, '__CALENDAR__'];
+          }
+        }
+
         const allChunks = await storageService.getAllChunks(searchSubjects);
         
         if (allChunks.length > 0) {

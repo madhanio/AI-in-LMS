@@ -213,6 +213,7 @@ export class AiService {
     1. Answers MUST be grounded in the provided [CONTEXT]. 
     2. Start directly with the answer. 
     3. Use Markdown (Bold, Lists) for clarity.
+    4. GENERAL MODE: If no specific PDF results are found in the [CONTEXT], but the student is asking about their syllabus overview or subjects, use the context to list their subjects and provide general academic guidance. DO NOT just say "Topic not covered" for general meta-questions.
     
     DYNAMIC CONTEXT:
     Today: ${dateString}.
