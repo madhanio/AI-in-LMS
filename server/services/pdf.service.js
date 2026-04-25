@@ -311,6 +311,7 @@ export class PdfService {
     let currentIndex = 0;
     let currentPage = 1;
     let currentSection = "General";
+    let currentPageModule = null;
 
     while (currentIndex < processedText.length) {
       let nextIndex = currentIndex + size;
