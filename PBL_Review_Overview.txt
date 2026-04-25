@@ -1,41 +1,59 @@
 ================================================================================
-ACADEMICCORE AI - PBL REVIEW 2 OVERVIEW
+ACADEMICCORE AI - PBL REVIEW 2 COMPREHENSIVE OVERVIEW
 ================================================================================
 
-1. PROJECT IDENTITY & DOMAIN
-----------------------------
-Project Title: AcademicCore AI (Specialized LMS Assistant)
-Domain: Artificial Intelligence (AI) - Specialized Chatbot
-Goal: A "Syllabus Expert" providing grounded, accurate academic answers.
+1. SYSTEM DEVELOPMENT (How we built it)
+----------------------------------------
+The system was developed using a modular RAG (Retrieval-Augmented Generation) 
+architecture to ensure data privacy and academic grounding:
+- UI Development: Built a cross-platform mobile application using Flutter, 
+  focusing on a modern, gradient-based Academic UI (Rebranded as AcademicCore).
+- Backend Orchestration: Developed a Node.js (Express) server to handle PDF 
+  ingestion, chunking, and intent classification.
+- Database & Vector Search: Leveraged Supabase with pgvector. We store academic 
+  chunks as high-dimensional vectors to enable semantic matching.
+- AI Integration: Integrated NVIDIA's AI Foundation models for high-quality 
+  embeddings and reasoning, ensuring the AI strictly follows syllabus context.
 
-2. TECHNICAL ARCHITECTURE
--------------------------
-Frontend: Cross-platform Flutter Mobile App.
-Backend: Node.js (Express) Server.
-Database: Supabase (PostgreSQL + pgvector).
-AI Engine: NVIDIA AI Foundation (Mistral/Llama series) using RAG.
+2. RESULTS & OUTPUT EXPLANATION
+-------------------------------
+- Grounded Responses: The AI provides answers solely based on the uploaded 
+  PDF/Word materials, effectively eliminating hallucinations.
+- Source Attribution: Real-time generation of "Source Chips" that allow 
+  students to click and open the exact PDF page used by the AI.
+- Educational Mentoring: Features a "Quiz Mode" that generates questions one 
+  at a time without providing answers, encouraging critical thinking.
+- Administrative Control: A custom Web Dashboard allows for real-time subject 
+  management and dataset updates with cascading database synchronization.
 
-3. THE AI "TRAINING" LOGIC (RAG PIPELINE)
------------------------------------------
-The AI uses Retrieval-Augmented Generation (RAG):
-- Processing: PDFs/Word docs processed at 150 DPI for efficiency.
-- Retrieval: Vectors search for top 15 chunks based on context.
-- Grounding: AI is forced to answer ONLY from the context (Scoring > 0.35).
+3. CHALLENGES FACED
+-------------------
+- Memory Constraints: Faced frequent 'JavaScript heap out of memory' (OOM) 
+  errors on Render's 512MB RAM tier. Resolved by increasing the heap limit to 
+  450MB and optimizing PDF image processing to 150 DPI.
+- Server Downtime: Render's free tier sleeps after 15 minutes of inactivity. 
+  Solved by implementing a 14-minute Node-cron heartbeat (Keep-alive) job.
+- Intent Differentiation: Distinguishing between syllabus modules and question 
+  banks was challenging. We solved this by adding document-type metadata tags.
 
-4. NUMERICAL OPTIMIZATIONS & STATS
-----------------------------------
-- RAM Usage: Optimized to fit within 512MB (Render Free Tier).
-- Heap Limit: Manually boosted to 450MB in package.json.
-- Keep-Alive: 14-minute Heartbeat Cron Job for 24/7 availability.
-- Search Speed: Context retrieval in < 200ms.
-- Model Precision: Quiz mode presents exactly 1 question at a time.
+4. WEEKLY PROGRESS & CONSISTENCY
+--------------------------------
+- Week 1-2: Initial setup of Supabase and basic PDF-to-Vector pipeline.
+- Week 3: Flutter UI development and basic chat streaming integration.
+- Week 4: Focused on stability; implemented memory fixes and keep-alive 
+  mechanisms to ensure 24/7 production availability.
+- Week 5: UI Refinement; Rebranded to AcademicCore, added dynamic suggestion 
+  chips, and enabled text selection/copying for better UX.
 
-5. KEY BREAKTHROUGHS
---------------------
-- Source Chips: Clickable links reveal exactly where the AI got the answer.
-- Admin Panel: Full control over Subjects with cascading DB updates.
-- Selectable Text: Users can long-press to copy any part of the chat.
-- Intent Detection: AI differentiates between "Question Banks" and "Modules".
+5. FUTURE SCOPE
+---------------
+- Multi-lingual Support: Enabling the AI to explain complex engineering 
+  concepts in local regional languages.
+- Handwritten Note Recognition: Using advanced OCR to ingest student 
+  hand-written notes into the knowledge base.
+- Personalization: Creating custom study schedules based on individual 
+  student performance and analytics.
+- Voice Interaction: A hands-free mode for the Academic Mentor.
 
 ================================================================================
 PREPARED FOR HITAM PBL REVIEW 2
