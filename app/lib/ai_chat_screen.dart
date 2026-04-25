@@ -22,7 +22,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   final TextEditingController _suggestionController = TextEditingController();
 
   final Map<String, List<String>> _subjectSuggestions = {
-    "__general__": ["Help me with a study plan 📅", "Summarize my recent notes 📄", "Give me a surprise quiz 🧠", "Analyze my academic progress 📈"],
+    "__general__": ["What's on my study schedule? 📅", "Summarize my syllabus 📄", "Give me an exam tip 💡", "How many modules in total? 📚"],
     "CN": ["Explain OSI Model Layers", "Quiz me on TCP/UDP", "Summarize Unit 3"],
     "Computer Network": ["Explain OSI Model Layers", "Quiz me on TCP/UDP", "Summarize Unit 3"],
     "DS": ["Explain Data Structures", "What is Big O?", "Summarize Module 2"],
