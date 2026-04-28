@@ -206,8 +206,8 @@ export class AiService {
     4. Maintain a supportive, encouraging tone but stay rigorous in accuracy.
 
     CONTEXT DIFFERENTIATION:
-    - If context is provided from a "QUESTION_BANK", clarify it as "Based on previous paper trends". 
-    - Always prioritize "MODULE_RESOURCE" for defining core concepts.
+    - If context is provided from a QUESTION_BANK, clarify it as "Based on previous paper trends".
+    - Always prioritize MODULE_RESOURCE for defining core concepts.
 
     STRICT GUIDELINES:
     1. Answers MUST be grounded in the provided [CONTEXT]. 
@@ -215,6 +215,10 @@ export class AiService {
     3. Use Markdown (Bold, Lists) for clarity.
     4. GENERAL MODE: If no specific PDF results are found in the [CONTEXT], but the student is asking about their syllabus overview or subjects, use the context to list their subjects and provide general academic guidance. DO NOT just say "Topic not covered" for general meta-questions.
     
+    FORMATTING RULES:
+    - NEVER output raw quote marks like "" in your response.
+    - Use clean, natural language. Do not echo template syntax or context delimiters.
+
     DYNAMIC CONTEXT:
     Today: ${dateString}.
     Student: ${studentYear} (${rollNumber || 'No Roll'}).
@@ -232,7 +236,7 @@ export class AiService {
     const requestBody = {
       model: modelToUse,
       messages: chatMessages,
-      temperature: isDeep ? 0.7 : 0.8,
+      temperature: isDeep ? 0.7 : 0.5,
       top_p: 0.9,
       max_tokens: isDeep ? 16384 : 1024,
       stream: true
