@@ -96,7 +96,7 @@ class ChatProvider extends ChangeNotifier {
 
     // 🕵️ SILENT REQUEST: Trigger a professional introduction as the Academic Mentor
     const prompt = "Introduce yourself as the Academic Mentor. Generate a single, very short, and calm Zen-like professional greeting. Strictly one short line only. Vibe: Specialized LMS Assistant.";
-    await _getAIResponse(prompt, []);
+    await _getAIResponse(prompt, [], isGreeting: true);
   }
 
   /// 🏛️ ARCHIVE LOGIC: Live updates the active session to history
@@ -254,7 +254,7 @@ class ChatProvider extends ChangeNotifier {
   }
 
   /// ⚡ Core AI Interaction Engine (Private)
-  Future<void> _getAIResponse(String question, List<Map<String, dynamic>> historyMap) async {
+  Future<void> _getAIResponse(String question, List<Map<String, dynamic>> historyMap, {bool isGreeting = false}) async {
     String finalQuestion = question;
     if (_selectedSubject != null) {
       finalQuestion = "[Subject: $_selectedSubject] $question";
@@ -270,6 +270,7 @@ class ChatProvider extends ChangeNotifier {
         'question': finalQuestion,
         'subject': _selectedSubject,
         'history': historyMap,
+        if (isGreeting) 'isGreeting': true,
       });
 
       final response = await client.send(request).timeout(const Duration(seconds: 90));

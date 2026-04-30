@@ -249,7 +249,9 @@ router.post('/settings/model', authenticateAdmin, (req, res) => {
 router.post('/query', async (req, res) => {
   const startTime = Date.now();
   let finalContext = "No specific lecture notes found for this query.";
-  const { question, subject, history = [], rollNumber = "" } = req.body;
+  const { question, subject, history = [], rollNumber = "", isGreeting = false } = req.body;
+  let usedSourceContext = false; // 🔒 Only true when answer genuinely comes from uploaded sources
+  let isCalendar = false; // Hoisted for cache logic after streaming
 
   try {
     if (!question) {
@@ -258,146 +260,150 @@ router.post('/query', async (req, res) => {
 
     console.log(`Querying ${subject || 'global'} for: ${question}`);
 
-    // 🔥 TIER 2: THE TRAFFIC COP (LLM Gatekeeper)
-    const isCalendar = await aiService.isCalendarRelevance(question);
-    console.log(`Traffic Cop Result (is_calendar): ${isCalendar}`);
+    // 🔥 FAST PATH: Greeting & casual queries skip the entire RAG pipeline
+    const greetingPatterns = /^(hi|hello|hey|introduce|greet|good morning|good evening|who are you)/i;
+    const isCasualQuery = isGreeting || greetingPatterns.test(question.trim()) || (!subject && history.length === 0 && question.toLowerCase().includes('introduce'));
 
-    if (isCalendar) {
-        // 🧠 TIER 1: SEMANTIC CACHE (Local Memory - Calendar ONLY)
-        const cachedAnswer = await aiService.checkCache(question);
-        if (cachedAnswer) {
-           console.log("⚡ Serving Calendar from Cache...");
-           res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-           res.setHeader('Cache-Control', 'no-cache');
-           res.flushHeaders();
-           res.write(cachedAnswer);
-           return res.end();
-        }
+    if (!isCasualQuery) {
+      // 🔥 TIER 2: THE TRAFFIC COP (LLM Gatekeeper)
+      isCalendar = await aiService.isCalendarRelevance(question);
+      console.log(`Traffic Cop Result (is_calendar): ${isCalendar}`);
 
-        console.log("📅 Routing to Structured Calendar Lane (SQL)...");
-        const events = await storageService.searchCalendarEvents(question);
-        
-        if (events.length > 0) {
-          const formatDate = (d) => {
-            if (!d) return null;
-            const date = new Date(d + 'T00:00:00');
-            return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
-          };
-          finalContext = "Academic Calendar Events:\n" + events.map(e => {
-            const from = formatDate(e.date_from);
-            const to = formatDate(e.date_to);
-            const dateStr = (from && to) ? `${from} to ${to}` : (e.date_raw || "Date TBD");
-            return `- ${e.event_name} (Semester: ${e.semester}): ${dateStr} ${e.date_is_approximate ? '[APPROXIMATE]' : ''}`;
-          }).join('\n');
-          console.log(`✅ SQL Path success. Found ${events.length} events (Prioritizing Edited Dates).`);
-        } else {
-          console.log("⚠️ SQL empty for calendar query. Falling back to vector search.");
-        }
-    }
-
-    // TIER 3: Standard Academic Search (Only if context is still empty or not purely a calendar query)
-    if (finalContext.includes("No specific lecture notes")) {
-        // 🔥 NEW: Extract user intent filters (e.g., "Module 3" or "Question Bank")
-        const queryMeta = await aiService.extractQueryMetadata(question);
-        console.log("Query Filters Detected:", queryMeta);
-
-        const queryEmbedding = await aiService.getEmbedding(question, "query");
-        
-        let searchSubjects = subject ? [subject, '__CALENDAR__'] : ['__CALENDAR__'];
-        
-        // 🔥 IMPROVED: If no subject is selected, search the global calendar AND a sample of all subjects
-        // to handle general queries like "Summarize my syllabus" or "What subjects do I have?"
-        if (!subject) {
-          const allSubjectNames = await storageService.getSubjects();
-          if (allSubjectNames && allSubjectNames.length > 0) {
-            searchSubjects = [...allSubjectNames, '__CALENDAR__'];
+      if (isCalendar) {
+          // 🧠 TIER 1: SEMANTIC CACHE (Local Memory - Calendar ONLY)
+          const cachedAnswer = await aiService.checkCache(question);
+          if (cachedAnswer) {
+             console.log("⚡ Serving Calendar from Cache...");
+             res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+             res.setHeader('Cache-Control', 'no-cache');
+             res.flushHeaders();
+             res.write(cachedAnswer);
+             return res.end();
           }
-        }
 
-        const allChunks = await storageService.getAllChunks(searchSubjects);
-        
-        if (allChunks.length > 0) {
-          const keywords = question.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+          console.log("📅 Routing to Structured Calendar Lane (SQL)...");
+          const events = await storageService.searchCalendarEvents(question);
           
-          const scoredChunks = allChunks.map(c => {
-            const semanticScore = cosineSimilarity(queryEmbedding, c.embedding);
-            const isCalendarChunk = c.subject === '__CALENDAR__';
-            
-            // 🔥 METADATA BOOSTING
-            let metaBoost = 0;
-            if (queryMeta.targetModule && c.module_number === queryMeta.targetModule) {
-                metaBoost += 0.25; // Massive boost for requested module
-            }
-            if (queryMeta.targetDocType && c.doc_type === queryMeta.targetDocType) {
-                metaBoost += 0.20; // Massive boost for requested doc type (QB/Model Paper)
-            }
-
-            let keywordMatches = 0;
-            const textLower = c.text.toLowerCase();
-            keywords.forEach(kw => { if (textLower.includes(kw)) keywordMatches += 0.05; });
-
-            const finalScore = semanticScore + Math.min(keywordMatches, 0.15) + (isCalendarChunk ? 0.12 : 0) + metaBoost;
-            return { ...c, score: finalScore };
-          });
-
-          // Sort by score
-          scoredChunks.sort((a, b) => b.score - a.score);
-
-          // 🔥 LOOSE FILTERING / TOP-UP LOGIC
-          // 1. First, take only the strong matches that hit the metadata target
-          let primaryChunks = scoredChunks.filter(c => {
-              const matchesModule = queryMeta.targetModule ? c.module_number === queryMeta.targetModule : true;
-              const matchesType = queryMeta.targetDocType ? c.doc_type === queryMeta.targetDocType : true;
-              return matchesModule && matchesType && c.score > 0.35;
-          });
-
-          // 2. If we found fewer than 5 high-quality matches, "Top-up" with general subject chunks
-          let finalSelection = [...primaryChunks];
-          if (finalSelection.length < 5) {
-              const secondaryChunks = scoredChunks.filter(c => 
-                  !primaryChunks.some(pc => pc.content === c.content) && c.score > 0.35
-              ).slice(0, 5 - finalSelection.length);
-              finalSelection.push(...secondaryChunks);
+          if (events.length > 0) {
+            const formatDate = (d) => {
+              if (!d) return null;
+              const date = new Date(d + 'T00:00:00');
+              return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
+            };
+            finalContext = "Academic Calendar Events:\n" + events.map(e => {
+              const from = formatDate(e.date_from);
+              const to = formatDate(e.date_to);
+              const dateStr = (from && to) ? `${from} to ${to}` : (e.date_raw || "Date TBD");
+              return `- ${e.event_name} (Semester: ${e.semester}): ${dateStr} ${e.date_is_approximate ? '[APPROXIMATE]' : ''}`;
+            }).join('\n');
+            console.log(`✅ SQL Path success. Found ${events.length} events (Prioritizing Edited Dates).`);
+          } else {
+            console.log("⚠️ SQL empty for calendar query. Falling back to vector search.");
           }
+      }
 
-          // Limit to max 15 chunks for context window safety
-          let topChunks = finalSelection.slice(0, 15);
+      // TIER 3: Standard Academic Search (Only if context is still empty or not purely a calendar query)
+      if (finalContext.includes("No specific lecture notes")) {
+          // 🔥 NEW: Extract user intent filters (e.g., "Module 3" or "Question Bank")
+          const queryMeta = await aiService.extractQueryMetadata(question);
+          console.log("Query Filters Detected:", queryMeta);
 
-          // 🔥 Step 5: Context Window Quality Filter
-          // Remove any tiny cleaning survivors (< 100 chars)
-          const filteredChunks = topChunks.filter(c => c.text.length > 100);
+          const queryEmbedding = await aiService.getEmbedding(question, "query");
           
-          // Safety Switch: If filtering kills too much context, keep the originals
-          if (filteredChunks.length >= 5) {
-              topChunks = filteredChunks;
+          let searchSubjects = subject ? [subject, '__CALENDAR__'] : ['__CALENDAR__'];
+          
+          // 🔥 IMPROVED: If no subject is selected, search the global calendar AND a sample of all subjects
+          // to handle general queries like "Summarize my syllabus" or "What subjects do I have?"
+          if (!subject) {
+            const allSubjectNames = await storageService.getSubjects();
+            if (allSubjectNames && allSubjectNames.length > 0) {
+              searchSubjects = [...allSubjectNames, '__CALENDAR__'];
+            }
           }
 
-          if (topChunks.length > 0) {
-            console.log(`✅ Injecting ${topChunks.length} chunks (Primary: ${primaryChunks.length}). Filters: M=${queryMeta.targetModule}, T=${queryMeta.targetDocType}`);
-            finalContext = topChunks.map(c => `[${c.file_name}${c.page_number ? ' p.' + c.page_number : ''}] ${c.text}`).join('\n---\n');
+          const allChunks = await storageService.getAllChunks(searchSubjects);
+          
+          if (allChunks.length > 0) {
+            const keywords = question.toLowerCase().split(/\s+/).filter(w => w.length > 3);
             
-            // 🔥 SOURCE CARD FILTERING
-            // We only show source cards if we actually found something relevant.
-            // Since our search (scoredChunks) is already restricted to the selected subject 
-            // and the global calendar, we can trust these sources are contextually appropriate.
+            const scoredChunks = allChunks.map(c => {
+              const semanticScore = cosineSimilarity(queryEmbedding, c.embedding);
+              const isCalendarChunk = c.subject === '__CALENDAR__';
+              
+              // 🔥 METADATA BOOSTING
+              let metaBoost = 0;
+              if (queryMeta.targetModule && c.module_number === queryMeta.targetModule) {
+                  metaBoost += 0.25; // Massive boost for requested module
+              }
+              if (queryMeta.targetDocType && c.doc_type === queryMeta.targetDocType) {
+                  metaBoost += 0.20; // Massive boost for requested doc type (QB/Model Paper)
+              }
+
+              let keywordMatches = 0;
+              const textLower = c.text.toLowerCase();
+              keywords.forEach(kw => { if (textLower.includes(kw)) keywordMatches += 0.05; });
+
+              const finalScore = semanticScore + Math.min(keywordMatches, 0.15) + (isCalendarChunk ? 0.12 : 0) + metaBoost;
+              return { ...c, score: finalScore };
+            });
+
+            // Sort by score
+            scoredChunks.sort((a, b) => b.score - a.score);
+
+            // 🔥 LOOSE FILTERING / TOP-UP LOGIC
+            // 1. First, take only the strong matches that hit the metadata target
+            let primaryChunks = scoredChunks.filter(c => {
+                const matchesModule = queryMeta.targetModule ? c.module_number === queryMeta.targetModule : true;
+                const matchesType = queryMeta.targetDocType ? c.doc_type === queryMeta.targetDocType : true;
+                return matchesModule && matchesType && c.score > 0.35;
+            });
+
+            // 2. If we found fewer than 5 high-quality matches, "Top-up" with general subject chunks
+            let finalSelection = [...primaryChunks];
+            if (finalSelection.length < 5) {
+                const secondaryChunks = scoredChunks.filter(c => 
+                    !primaryChunks.some(pc => pc.content === c.content) && c.score > 0.35
+                ).slice(0, 5 - finalSelection.length);
+                finalSelection.push(...secondaryChunks);
+            }
+
+            // Limit to max 15 chunks for context window safety
+            let topChunks = finalSelection.slice(0, 15);
+
+            // 🔥 Step 5: Context Window Quality Filter
+            // Remove any tiny cleaning survivors (< 100 chars)
+            const filteredChunks = topChunks.filter(c => c.text.length > 100);
+            
+            // Safety Switch: If filtering kills too much context, keep the originals
+            if (filteredChunks.length >= 5) {
+                topChunks = filteredChunks;
+            }
+
             if (topChunks.length > 0) {
+              console.log(`✅ Injecting ${topChunks.length} chunks (Primary: ${primaryChunks.length}). Filters: M=${queryMeta.targetModule}, T=${queryMeta.targetDocType}`);
+              finalContext = topChunks.map(c => `[${c.file_name}${c.page_number ? ' p.' + c.page_number : ''}] ${c.text}`).join('\n---\n');
+              usedSourceContext = true; // ✅ Context genuinely came from uploaded sources
+              
+              // 🔥 SOURCE CARD FILTERING
+              // Only show source cards when the answer genuinely used uploaded content
               const uniqueNames = [...new Set(
                 topChunks
-                  .filter(c => c.doc_type !== 'QUESTION_BANK')
+                  .filter(c => c.doc_type !== 'QUESTION_BANK' && c.subject !== '__CALENDAR__')
                   .map(c => c.file_name)
                   .filter(n => n)
               )];
-              req.sourceUrls = await storageService.getFileUrls(uniqueNames);
-            } else {
-              req.sourceUrls = {}; 
+              if (uniqueNames.length > 0) {
+                req.sourceUrls = await storageService.getFileUrls(uniqueNames);
+              }
             }
           }
-        }
+      }
+    } else {
+      console.log("💬 Casual/Greeting query detected. Skipping RAG pipeline.");
     }
 
     // Fast local intent detection (no LLM call needed)
-    const wordCount = question.trim().split(/\s+/).length;
-    const intent = wordCount >= 8 ? 'STUDY_DEEP' : 'STUDY_QUICK';
+    const intent = isCasualQuery ? 'CASUAL' : (question.trim().split(/\s+/).length >= 8 ? 'STUDY_DEEP' : 'STUDY_QUICK');
     const stream = await aiService.getChatAnswer(question, finalContext, history, subject || 'General', intent, rollNumber);
     
     // Set headers for streaming (Critical for Render/Proxy stability)
@@ -418,7 +424,7 @@ router.post('/query', async (req, res) => {
         const text = new TextDecoder().decode(value);
         fullResponse += text;
 
-        if (text.includes('data: [DONE]') && Object.keys(req.sourceUrls || {}).length > 0) {
+        if (text.includes('data: [DONE]') && usedSourceContext && Object.keys(req.sourceUrls || {}).length > 0) {
            const payloadText = JSON.stringify({
               choices: [{ delta: { sources: Object.entries(req.sourceUrls).map(([n, u]) => ({name: n, url: u})) } }]
            });
