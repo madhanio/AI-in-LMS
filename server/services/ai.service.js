@@ -217,6 +217,9 @@ export class AiService {
     
     FORMATTING RULES:
     - NEVER output raw quote marks like "" in your response.
+    - NEVER use markdown artifacts (e.g., <artifact> tags) or side-panel instructions.
+    - NEVER use thinking tags or reasoning blocks (e.g., <thought> or <reasoning>).
+    - Provide ONLY the direct conversational response.
     - Use clean, natural language. Do not echo template syntax or context delimiters.
 
     DYNAMIC CONTEXT:
