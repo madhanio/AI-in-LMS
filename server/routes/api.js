@@ -327,7 +327,7 @@ router.post('/query', async (req, res) => {
       }
 
       // TIER 3: Standard Academic Search (Only if context is still empty or not purely a calendar query)
-      if (finalContext.includes("No specific lecture notes")) {
+      if (finalContext.includes("No specific materials uploaded")) {
           // 🔥 NEW: Extract user intent filters (e.g., "Module 3" or "Question Bank")
           const queryMeta = await aiService.extractQueryMetadata(cleanedQuestion);
           console.log("Query Filters Detected:", queryMeta);
