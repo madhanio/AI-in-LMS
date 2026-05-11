@@ -109,48 +109,6 @@ export class AiService {
   }
 
   /**
-   * TIER 2: THE TRAFFIC COP (LLM GATEKEEPER)
-   * Strictly determines if the query is schedule/calendar related.
-   */
-  async isCalendarRelevance(question) {
-    try {
-      const response = await fetch(`${BASE_URL}/chat/completions`, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${NVIDIA_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "meta/llama-3.1-8b-instruct",
-          messages: [
-            {
-              role: "system",
-              content: "You are a router. The user is asking about an academic schedule. Is the user asking for dates, deadlines, semesters, or exam schedules? Answer ONLY with a JSON object: {\"is_calendar\": true} or {\"is_calendar\": false}. Differentiate between 'exam' (test) and 'examine' (inspect)."
-            },
-            { role: "user", content: question }
-          ],
-          temperature: 0.1,
-          max_tokens: 20
-        })
-      });
-
-      if (!response.ok) return false;
-      const data = await response.json();
-      const raw = data.choices[0]?.message?.content || "";
-
-      // Robust JSON extraction: find the first {...} in the response
-      const jsonMatch = raw.match(/\{[^}]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        return parsed.is_calendar === true;
-      }
-
-      // Fallback: check if the raw text simply contains "true"
-      return raw.toLowerCase().includes('"is_calendar": true') || raw.toLowerCase().includes('"is_calendar":true');
-    } catch (e) {
-      console.error("Traffic Cop Error:", e.message);
-      return false;
-    }
-  }
-
-  /**
    * UPGRADE 1 — PREPROCESS QUERY
    * Fix typos and expand academic shorthand before anything else.
    * 'cn mod3 imp qns' → 'Computer Networks module 3 important questions'
@@ -215,6 +173,7 @@ Rules:
 - exam_preparation: quiz, important questions, past papers, MID, model paper, question bank
 - troubleshooting: error, fix, why isn't X working, problem with
 - student_data_query: my attendance, my timetable, my deadlines, my schedule
+- calendar_query: events, academic calendar, holidays, exam dates, college schedule
 
 CRITICAL: Respond ONLY with a valid JSON object. No explanation.
 JSON SCHEMA: { "intent": "...", "currentSubject": "..." | null, "activeModule": number | null }`
@@ -230,7 +189,7 @@ JSON SCHEMA: { "intent": "...", "currentSubject": "..." | null, "activeModule": 
       const raw = data.choices[0]?.message?.content || '{}';
       const parsed = JSON.parse(this.cleanJsonResponse(raw));
 
-      const validIntents = ['syllabus_query', 'concept_explanation', 'exam_preparation', 'troubleshooting', 'student_data_query'];
+      const validIntents = ['syllabus_query', 'concept_explanation', 'exam_preparation', 'troubleshooting', 'student_data_query', 'calendar_query'];
       const intent = validIntents.includes(parsed.intent) ? parsed.intent : 'concept_explanation';
 
       return {
@@ -246,7 +205,11 @@ JSON SCHEMA: { "intent": "...", "currentSubject": "..." | null, "activeModule": 
 
   async getChatAnswer(question, contextText, history = [], subject = "General Academics", intent = "concept_explanation", rollNumber = "", studentProfile = {}, activeModule = null) {
     const isCasual = intent === 'concept_explanation' && question.trim().split(/\s+/).length <= 3;
-    const modelToUse = currentModel;
+    
+    // UPGRADE 5 — MODEL ROUTING (Cost/Complexity optimization)
+    const simpleIntents = ['calendar_query', 'student_data_query', 'troubleshooting'];
+    const modelToUse = simpleIntents.includes(intent) ? "meta/llama-3.1-8b-instruct" : currentModel;
+    
     console.log(`🧠 Using model: ${modelToUse} | Intent: ${intent}`);
 
     // 🏙️ UPGRADE 5 — INTENT-TO-STRATEGY MAP
@@ -256,6 +219,7 @@ JSON SCHEMA: { "intent": "...", "currentSubject": "..." | null, "activeModule": 
       troubleshooting:   { temperature: 0.4, max_tokens: 1024,  style: 'Respond step-by-step. Number each step. Diagnose before prescribing. Be precise and actionable.' },
       syllabus_query:    { temperature: 0.4, max_tokens: 1536,  style: 'Structure response module-wise. Use bold headers per module. Be comprehensive but organized.' },
       student_data_query:{ temperature: 0.2, max_tokens: 512,   style: 'Respond directly with the requested data first. Minimal prose. No filler.' },
+      calendar_query:    { temperature: 0.2, max_tokens: 512,   style: 'Extract and state exactly what the academic calendar says about the queried dates. Do not invent events.' }
     };
 
     const strategy = intentStrategyMap[intent] || intentStrategyMap['concept_explanation'];

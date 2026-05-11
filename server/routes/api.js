@@ -271,20 +271,31 @@ router.post('/query', async (req, res) => {
       });
     }
 
-    console.log(`Querying ${subject || 'global'} for: ${question}`);
-
     // 🔥 FAST PATH: Greeting & casual queries skip the entire RAG pipeline
     const greetingPatterns = /^(hi|hello|hey|introduce|greet|good morning|good evening|who are you)/i;
     const isCasualQuery = isGreeting || greetingPatterns.test(question.trim()) || (!subject && history.length === 0 && question.toLowerCase().includes('introduce'));
 
-    if (!isCasualQuery) {
-      // 🔥 TIER 2: THE TRAFFIC COP (LLM Gatekeeper)
-      isCalendar = await aiService.isCalendarRelevance(question);
-      console.log(`Traffic Cop Result (is_calendar): ${isCalendar}`);
+    // Sequential pipeline: preprocess raw query first, then classify the CLEANED input
+    let cleanedQuestion = question;
+    let intentResult = { intent: 'concept_explanation', currentSubject: subject || 'General', activeModule: null };
 
+    if (!isCasualQuery) {
+      cleanedQuestion = await aiService.preprocessQuery(question);
+      if (cleanedQuestion !== question) {
+        console.log(`📝 Preprocessed: "${question}" → "${cleanedQuestion}"`);
+      }
+      intentResult = await aiService.getIntent(cleanedQuestion);
+    }
+
+    const intent = intentResult.intent;
+    const currentSubject = intentResult.currentSubject || subject || 'General';
+    const activeModule = intentResult.activeModule;
+    isCalendar = intent === 'calendar_query';
+
+    if (!isCasualQuery) {
       if (isCalendar) {
           // 🧠 TIER 1: SEMANTIC CACHE (Local Memory - Calendar ONLY)
-          const cachedAnswer = await aiService.checkCache(question);
+          const cachedAnswer = await aiService.checkCache(cleanedQuestion);
           if (cachedAnswer) {
              console.log("⚡ Serving Calendar from Cache...");
              res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
@@ -295,7 +306,7 @@ router.post('/query', async (req, res) => {
           }
 
           console.log("📅 Routing to Structured Calendar Lane (SQL)...");
-          const events = await storageService.searchCalendarEvents(question);
+          const events = await storageService.searchCalendarEvents(cleanedQuestion);
           
           if (events.length > 0) {
             const formatDate = (d) => {
@@ -318,10 +329,10 @@ router.post('/query', async (req, res) => {
       // TIER 3: Standard Academic Search (Only if context is still empty or not purely a calendar query)
       if (finalContext.includes("No specific lecture notes")) {
           // 🔥 NEW: Extract user intent filters (e.g., "Module 3" or "Question Bank")
-          const queryMeta = await aiService.extractQueryMetadata(question);
+          const queryMeta = await aiService.extractQueryMetadata(cleanedQuestion);
           console.log("Query Filters Detected:", queryMeta);
 
-          const queryEmbedding = await aiService.getEmbedding(question, "query");
+          const queryEmbedding = await aiService.getEmbedding(cleanedQuestion, "query");
           
           let searchSubjects = subject ? [subject, '__CALENDAR__'] : ['__CALENDAR__'];
           
@@ -337,7 +348,7 @@ router.post('/query', async (req, res) => {
           const allChunks = await storageService.getAllChunks(searchSubjects);
           
           if (allChunks.length > 0) {
-            const keywords = question.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+            const keywords = cleanedQuestion.toLowerCase().split(/\s+/).filter(w => w.length > 3);
             
             const scoredChunks = allChunks.map(c => {
               const semanticScore = cosineSimilarity(queryEmbedding, c.embedding);
@@ -415,22 +426,6 @@ router.post('/query', async (req, res) => {
       console.log("💬 Casual/Greeting query detected. Skipping RAG pipeline.");
     }
 
-    // Sequential pipeline: preprocess raw query first, then classify the CLEANED input
-    let cleanedQuestion = question;
-    let intentResult = { intent: 'concept_explanation', currentSubject: subject || 'General', activeModule: null };
-
-    if (!isCasualQuery) {
-      cleanedQuestion = await aiService.preprocessQuery(question);
-      if (cleanedQuestion !== question) {
-        console.log(`📝 Preprocessed: "${question}" → "${cleanedQuestion}"`);
-      }
-      intentResult = await aiService.getIntent(cleanedQuestion);
-    }
-
-    const intent = intentResult.intent;
-    const currentSubject = intentResult.currentSubject || subject || 'General';
-    const activeModule = intentResult.activeModule;
-
     const stream = await aiService.getChatAnswer(
       cleanedQuestion,
       finalContext,
@@ -472,7 +467,7 @@ router.post('/query', async (req, res) => {
       }
       // Save to Tier 1 Cache for future hits (Calendar ONLY)
       if (fullResponse.length > 0 && isCalendar) {
-        aiService.saveToCache(question, fullResponse);
+        aiService.saveToCache(cleanedQuestion, fullResponse);
       }
 
       // 🛡️ UPGRADE 7 — POST-STREAM VALIDATION
