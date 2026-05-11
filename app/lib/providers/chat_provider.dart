@@ -105,7 +105,7 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
 
     // 🕵️ SILENT REQUEST: Trigger a professional introduction as the Academic Mentor
-    const prompt = "Introduce yourself as the Academic Mentor. Generate a single, very short, and calm Zen-like professional greeting. Strictly one short line only. NO ARTIFACTS. NO TAGS. NO THINKING. Vibe: Specialized LMS Assistant.";
+    const prompt = "Introduce yourself as the Academic Mentor. Generate a single, very short, and calm Zen-like professional greeting. Strictly one short line only. CRITICAL: Do not use any XML tags, <antArtifact>, <artifact>, or markdown blocks. Just plain text. Vibe: Specialized LMS Assistant.";
     await _getAIResponse(prompt, [], isGreeting: true);
   }
 

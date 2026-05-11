@@ -257,8 +257,8 @@ JSON SCHEMA: { "intent": "...", "currentSubject": "..." | null, "activeModule": 
 
     FORMATTING RULES:
     - NEVER output raw quote marks like "" in your response.
-    - NEVER use markdown artifacts (e.g., <artifact> tags) or side-panel instructions.
-    - NEVER use thinking tags or reasoning blocks (e.g., <thought> or <reasoning>).
+    - NEVER use markdown artifacts (e.g., <artifact> tags, <antArtifact> tags) or side-panel instructions.
+    - NEVER USE XML. No <thought>, <reasoning>, <antArtifact>, or <artifact> tags. If you use XML tags, the system will crash.
     - Provide ONLY the direct conversational response.
     - Use clean, natural language. Do not echo template syntax or context delimiters.
 
@@ -280,7 +280,7 @@ JSON SCHEMA: { "intent": "...", "currentSubject": "..." | null, "activeModule": 
       ...history,
       {
         role: "user",
-        content: isCasual ? question : `--- CONTEXT START ---\n${contextText}\n--- CONTEXT END ---\n\nStudent's Question: ${question}`
+        content: isCasual ? question + '\n\nCRITICAL: Respond directly. DO NOT use <antArtifact>, <artifact>, or any XML tags.' : `--- CONTEXT START ---\n${contextText}\n--- CONTEXT END ---\n\nStudent's Question: ${question}\n\nCRITICAL RULE: DO NOT use <antArtifact>, <artifact>, or any XML tags in your response. Respond in plain conversational text only.`
       }
     ];
 
