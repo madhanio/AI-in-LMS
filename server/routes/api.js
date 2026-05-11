@@ -379,14 +379,14 @@ router.post('/query', async (req, res) => {
             let primaryChunks = scoredChunks.filter(c => {
                 const matchesModule = queryMeta.targetModule ? c.module_number === queryMeta.targetModule : true;
                 const matchesType = queryMeta.targetDocType ? c.doc_type === queryMeta.targetDocType : true;
-                return matchesModule && matchesType && c.score > 0.40;  // Upgrade 4: raised floor from 0.35
+                return matchesModule && matchesType && c.score > 0.30;
             });
 
             // 2. If we found fewer than 5 high-quality matches, "Top-up" with general subject chunks
             let finalSelection = [...primaryChunks];
             if (finalSelection.length < 5) {
                 const secondaryChunks = scoredChunks.filter(c =>
-                    !primaryChunks.some(pc => pc.content === c.content) && c.score > 0.40  // Upgrade 4: consistent floor
+                    !primaryChunks.some(pc => pc.content === c.content) && c.score > 0.30
                 ).slice(0, 5 - finalSelection.length);
                 finalSelection.push(...secondaryChunks);
             }
