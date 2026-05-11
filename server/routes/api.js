@@ -5,6 +5,8 @@ import dotenv from 'dotenv';
 import { storageService } from '../services/storage.service.js';
 import { pdfService } from '../services/pdf.service.js';
 import { aiService } from '../services/ai.service.js';
+import { lmsService } from '../services/lms.service.js';
+import { logService } from '../services/log.service.js';
 import { cosineSimilarity } from '../utils/vector.util.js';
 import { authenticateAdmin } from '../middleware/auth.js';
 
@@ -248,14 +250,25 @@ router.post('/settings/model', authenticateAdmin, (req, res) => {
 
 router.post('/query', async (req, res) => {
   const startTime = Date.now();
-  let finalContext = "No specific lecture notes found for this query.";
-  const { question, subject, history = [], rollNumber = "", isGreeting = false } = req.body;
+  let finalContext = "No specific materials uploaded for this topic. Do not answer from general knowledge.";
+  const { question, subject, history = [], rollNumber = "", isGreeting = false, studentProfile = {} } = req.body;
   let usedSourceContext = false; // 🔒 Only true when answer genuinely comes from uploaded sources
   let isCalendar = false; // Hoisted for cache logic after streaming
+
+  // 🔒 SERVER-SIDE HISTORY TRIM: enforce last 5 exchanges (10 msgs max)
+  const trimmedHistory = history.slice(-10);
 
   try {
     if (!question) {
       return res.status(400).json({ error: "Question is required" });
+    }
+
+    // 🔒 UPGRADE 6 — EXAM MODE GATE
+    if (lmsService.isExamModeActive()) {
+      return res.status(200).json({
+        locked: true,
+        message: "🔒 Exam Mode Active. Q&A is disabled during examination hours. Focus on your exam — you've got this!"
+      });
     }
 
     console.log(`Querying ${subject || 'global'} for: ${question}`);
@@ -355,14 +368,14 @@ router.post('/query', async (req, res) => {
             let primaryChunks = scoredChunks.filter(c => {
                 const matchesModule = queryMeta.targetModule ? c.module_number === queryMeta.targetModule : true;
                 const matchesType = queryMeta.targetDocType ? c.doc_type === queryMeta.targetDocType : true;
-                return matchesModule && matchesType && c.score > 0.35;
+                return matchesModule && matchesType && c.score > 0.40;  // Upgrade 4: raised floor from 0.35
             });
 
             // 2. If we found fewer than 5 high-quality matches, "Top-up" with general subject chunks
             let finalSelection = [...primaryChunks];
             if (finalSelection.length < 5) {
-                const secondaryChunks = scoredChunks.filter(c => 
-                    !primaryChunks.some(pc => pc.content === c.content) && c.score > 0.35
+                const secondaryChunks = scoredChunks.filter(c =>
+                    !primaryChunks.some(pc => pc.content === c.content) && c.score > 0.40  // Upgrade 4: consistent floor
                 ).slice(0, 5 - finalSelection.length);
                 finalSelection.push(...secondaryChunks);
             }
@@ -402,9 +415,32 @@ router.post('/query', async (req, res) => {
       console.log("💬 Casual/Greeting query detected. Skipping RAG pipeline.");
     }
 
-    // Fast local intent detection (no LLM call needed)
-    const intent = isCasualQuery ? 'CASUAL' : (question.trim().split(/\s+/).length >= 8 ? 'STUDY_DEEP' : 'STUDY_QUICK');
-    const stream = await aiService.getChatAnswer(question, finalContext, history, subject || 'General', intent, rollNumber);
+    // Sequential pipeline: preprocess raw query first, then classify the CLEANED input
+    let cleanedQuestion = question;
+    let intentResult = { intent: 'concept_explanation', currentSubject: subject || 'General', activeModule: null };
+
+    if (!isCasualQuery) {
+      cleanedQuestion = await aiService.preprocessQuery(question);
+      if (cleanedQuestion !== question) {
+        console.log(`📝 Preprocessed: "${question}" → "${cleanedQuestion}"`);
+      }
+      intentResult = await aiService.getIntent(cleanedQuestion);
+    }
+
+    const intent = intentResult.intent;
+    const currentSubject = intentResult.currentSubject || subject || 'General';
+    const activeModule = intentResult.activeModule;
+
+    const stream = await aiService.getChatAnswer(
+      cleanedQuestion,
+      finalContext,
+      trimmedHistory,
+      currentSubject,
+      intent,
+      rollNumber,
+      studentProfile,
+      activeModule
+    );
     
     // Set headers for streaming (Critical for Render/Proxy stability)
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
@@ -438,10 +474,71 @@ router.post('/query', async (req, res) => {
       if (fullResponse.length > 0 && isCalendar) {
         aiService.saveToCache(question, fullResponse);
       }
+
+      // 🛡️ UPGRADE 7 — POST-STREAM VALIDATION
+      // Extract plain text from SSE chunks for validation
+      const plainText = fullResponse
+        .split('\n')
+        .filter(l => l.startsWith('data: ') && !l.includes('[DONE]'))
+        .map(l => { try { return JSON.parse(l.slice(6))?.choices?.[0]?.delta?.content || ''; } catch { return ''; } })
+        .join('');
+
+      const validation = await aiService.validateResponse(plainText, finalContext, intent, currentSubject, false);
+
+      if (!validation.valid && validation.action === 'regenerate') {
+        // Contradiction: retry once with stronger instruction
+        console.warn(`⚠️ Validation: ${validation.failureType} detected. Retrying...`);
+        try {
+          const retryStream = await aiService.getChatAnswer(
+            `[STRICT] Only use the provided context. ${cleanedQuestion}`,
+            finalContext, trimmedHistory, currentSubject, intent, rollNumber, studentProfile, activeModule
+          );
+          const retryReader = retryStream.getReader();
+          let retryText = '';
+          while (true) {
+            const { done, value } = await retryReader.read();
+            if (done) break;
+            retryText += new TextDecoder().decode(value);
+            res.write(value);
+          }
+          // Validate retry — if still bad, emit fallback notice
+          const retryPlain = retryText.split('\n')
+            .filter(l => l.startsWith('data: ') && !l.includes('[DONE]'))
+            .map(l => { try { return JSON.parse(l.slice(6))?.choices?.[0]?.delta?.content || ''; } catch { return ''; } })
+            .join('');
+          const retryValidation = await aiService.validateResponse(retryPlain, finalContext, intent, currentSubject, false);
+          if (!retryValidation.valid) {
+            const fallbackPayload = JSON.stringify({ choices: [{ delta: { content: `\n\n---\n${validation.fallbackMessage}` } }] });
+            res.write(new TextEncoder().encode(`data: ${fallbackPayload}\n\n`));
+          }
+        } catch (retryErr) {
+          console.error('Retry failed:', retryErr.message);
+          const fallbackPayload = JSON.stringify({ choices: [{ delta: { content: `\n\n---\n${validation.fallbackMessage}` } }] });
+          res.write(new TextEncoder().encode(`data: ${fallbackPayload}\n\n`));
+        }
+      } else if (!validation.valid && (validation.action === 'fallback' || validation.action === 'block')) {
+        // Empty / wrong module / exam block — append fallback notice to stream
+        const fallbackPayload = JSON.stringify({ choices: [{ delta: { content: `\n\n---\n${validation.fallbackMessage}` } }] });
+        res.write(new TextEncoder().encode(`data: ${fallbackPayload}\n\n`));
+        console.warn(`⚠️ Validation fallback triggered: ${validation.failureType}`);
+      }
     } catch (err) {
       console.error("Stream interrupted", err);
     } finally {
       res.end();
+      // 📊 UPGRADE 8 — SILENT BACKGROUND LOGGING (fire-and-forget, no await)
+      logService.log({
+        rollNumber:          rollNumber || studentProfile?.rollNumber || null,
+        rawQuery:            question,
+        cleanedQuery:        cleanedQuestion,
+        intent,
+        subject:             currentSubject,
+        activeModule,
+        latencyMs:           Date.now() - startTime,
+        usedSourceContext,
+        validationFlag:      typeof validation !== 'undefined' ? validation.failureType : null,
+        wasFallback:         typeof validation !== 'undefined' ? !validation.valid : false,
+      }).catch(e => console.error('📊 Log error (non-critical):', e.message));
     }
   } catch (error) {
     console.error("Query Error:", error);
@@ -525,4 +622,31 @@ router.get('/prompts', (req, res) => {
   res.json({ suggestions: suggestions.sort(() => 0.5 - Math.random()).slice(0, 4) });
 });
 
+/**
+ * UPGRADE 6 — LMS DATA ROUTES
+ * All return mock data. Swap to real API by updating lms.service.js.
+ */
+router.get('/lms/attendance', (req, res) => {
+  const { rollNumber } = req.query;
+  res.json({ attendance: lmsService.getMockAttendance(rollNumber) });
+});
+
+router.get('/lms/timetable', (req, res) => {
+  const { section } = req.query;
+  res.json({ timetable: lmsService.getMockTimetable(section) });
+});
+
+router.get('/lms/deadlines', (req, res) => {
+  res.json({ deadlines: lmsService.getMockDeadlines() });
+});
+
+router.get('/lms/exams', (req, res) => {
+  res.json({ exams: lmsService.getMockExamSchedule() });
+});
+
+router.get('/lms/exam-mode', (req, res) => {
+  res.json({ active: lmsService.isExamModeActive() });
+});
+
 export default router;
+

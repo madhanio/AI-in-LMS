@@ -22,6 +22,16 @@ class ChatProvider extends ChangeNotifier {
   bool _isTyping = false;
   bool _greetingGenerated = false;
 
+  // UPGRADE 2 — Mock student profile (schema matches real auth fields for painless swap)
+  // TODO: Replace values with data from your auth provider (Supabase auth user metadata)
+  final Map<String, dynamic> _studentProfile = {
+    'name': 'Madhan',         // auth.user.userMetadata['full_name']
+    'rollNumber': '24HITCS',  // auth.user.userMetadata['roll_number']
+    'year': '2nd Year',       // auth.user.userMetadata['year']
+    'branch': 'CSE',          // auth.user.userMetadata['branch']
+    'section': 'A',           // auth.user.userMetadata['section']
+  };
+
   List<Message> get messages => _messages;
   List<ChatSession> get history => _history;
   List<String> get subjects => _subjects;
@@ -270,6 +280,7 @@ class ChatProvider extends ChangeNotifier {
         'question': finalQuestion,
         'subject': _selectedSubject,
         'history': historyMap,
+        'studentProfile': _studentProfile,  // UPGRADE 2
         if (isGreeting) 'isGreeting': true,
       });
 

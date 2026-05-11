@@ -150,7 +150,12 @@ export class AiService {
     }
   }
 
-  async getIntent(question) {
+  /**
+   * UPGRADE 1 — PREPROCESS QUERY
+   * Fix typos and expand academic shorthand before anything else.
+   * 'cn mod3 imp qns' → 'Computer Networks module 3 important questions'
+   */
+  async preprocessQuery(rawInput) {
     try {
       const response = await fetch(`${BASE_URL}/chat/completions`, {
         method: "POST",
@@ -163,45 +168,115 @@ export class AiService {
           messages: [
             {
               role: "system",
-              content: "Classify user intent into: 'CASUAL', 'STUDY_QUICK', 'STUDY_DEEP', or 'CALENDAR_QUERY'."
+              content: "You are an academic query normalizer for Indian engineering students. Fix typos, expand abbreviations, and resolve shorthand into full English phrases. Examples: 'cn mod3 imp qns' → 'Computer Networks module 3 important questions', 'ds linked list mid1' → 'Data Structures linked list MID 1 questions'. OUTPUT ONLY the cleaned query string. No explanation, no quotes, no punctuation at the end."
             },
-            { role: "user", content: question }
+            { role: "user", content: rawInput }
           ],
           temperature: 0.1,
-          max_tokens: 15
+          max_tokens: 150
         })
       });
+      if (!response.ok) return rawInput;
       const data = await response.json();
-      const content = (data.choices[0]?.message?.content || 'CASUAL').toUpperCase();
-
-      if (content.includes('CALENDAR')) return 'CALENDAR_QUERY';
-      if (content.includes('DEEP')) return 'STUDY_DEEP';
-      if (content.includes('QUICK')) return 'STUDY_QUICK';
-      return 'CASUAL';
-    } catch {
-      return 'STUDY_QUICK';
+      const cleaned = data.choices[0]?.message?.content?.trim() || rawInput;
+      return cleaned;
+    } catch (e) {
+      console.error("Preprocess Error:", e.message);
+      return rawInput;
     }
   }
 
-  async getChatAnswer(question, contextText, history = [], subject = "General Academics", intent = "STUDY_QUICK", rollNumber = "") {
-    const isDeep = intent === "STUDY_DEEP";
-    const isCasual = intent === "CASUAL";
+  /**
+   * UPGRADE 1 — INTENT CLASSIFICATION
+   * Must receive CLEANED input (post-preprocessQuery), not raw.
+   * Returns structured object: { intent, currentSubject, activeModule }
+   */
+  async getIntent(cleanedQuery) {
+    try {
+      const response = await fetch(`${BASE_URL}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${NVIDIA_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "meta/llama-3.1-8b-instruct",
+          messages: [
+            {
+              role: "system",
+              content: `You are an academic intent classifier for engineering students. Given a cleaned student query, extract:
+1. intent: ONE of: syllabus_query | concept_explanation | exam_preparation | troubleshooting | student_data_query
+2. currentSubject: The subject being asked about (e.g. 'Computer Networks', 'Data Structures'). null if unclear.
+3. activeModule: The module or unit number mentioned (e.g. 3 for 'module 3'). null if not mentioned.
+
+Rules:
+- syllabus_query: subject overview, what to study, list of topics, modules covered
+- concept_explanation: explain X, what is Y, how does Z work, definition of
+- exam_preparation: quiz, important questions, past papers, MID, model paper, question bank
+- troubleshooting: error, fix, why isn't X working, problem with
+- student_data_query: my attendance, my timetable, my deadlines, my schedule
+
+CRITICAL: Respond ONLY with a valid JSON object. No explanation.
+JSON SCHEMA: { "intent": "...", "currentSubject": "..." | null, "activeModule": number | null }`
+            },
+            { role: "user", content: cleanedQuery }
+          ],
+          temperature: 0.1,
+          max_tokens: 80,
+          response_format: { type: "json_object" }
+        })
+      });
+      const data = await response.json();
+      const raw = data.choices[0]?.message?.content || '{}';
+      const parsed = JSON.parse(this.cleanJsonResponse(raw));
+
+      const validIntents = ['syllabus_query', 'concept_explanation', 'exam_preparation', 'troubleshooting', 'student_data_query'];
+      const intent = validIntents.includes(parsed.intent) ? parsed.intent : 'concept_explanation';
+
+      return {
+        intent,
+        currentSubject: parsed.currentSubject || null,
+        activeModule: typeof parsed.activeModule === 'number' ? parsed.activeModule : null
+      };
+    } catch (e) {
+      console.error("Intent Error:", e.message);
+      return { intent: 'concept_explanation', currentSubject: null, activeModule: null };
+    }
+  }
+
+  async getChatAnswer(question, contextText, history = [], subject = "General Academics", intent = "concept_explanation", rollNumber = "", studentProfile = {}, activeModule = null) {
+    const isCasual = intent === 'concept_explanation' && question.trim().split(/\s+/).length <= 3;
     const modelToUse = currentModel;
-    console.log(`🧠 Using model: ${modelToUse}`);
+    console.log(`🧠 Using model: ${modelToUse} | Intent: ${intent}`);
+
+    // 🏙️ UPGRADE 5 — INTENT-TO-STRATEGY MAP
+    const intentStrategyMap = {
+      exam_preparation:  { temperature: 0.3, max_tokens: 1024,  style: 'Respond with concise, numbered bullet points. Be keyword-dense. Prioritize exam-relevant facts and definitions.' },
+      concept_explanation: { temperature: 0.6, max_tokens: 2048,  style: 'Explain using clear analogies. Progress from beginner-level intuition to technical depth. Use examples.' },
+      troubleshooting:   { temperature: 0.4, max_tokens: 1024,  style: 'Respond step-by-step. Number each step. Diagnose before prescribing. Be precise and actionable.' },
+      syllabus_query:    { temperature: 0.4, max_tokens: 1536,  style: 'Structure response module-wise. Use bold headers per module. Be comprehensive but organized.' },
+      student_data_query:{ temperature: 0.2, max_tokens: 512,   style: 'Respond directly with the requested data first. Minimal prose. No filler.' },
+    };
+
+    const strategy = intentStrategyMap[intent] || intentStrategyMap['concept_explanation'];
 
     const now = new Date();
     const dateString = now.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    const isSecondYear = rollNumber?.startsWith('24');
-    const studentYear = isSecondYear ? "2nd Year" : "University Student";
+    const isSecondYear = rollNumber?.startsWith('24') || studentProfile?.rollNumber?.startsWith('24');
+    const studentYear = studentProfile?.year || (isSecondYear ? "2nd Year" : "University Student");
+    const studentName = studentProfile?.name || 'Student';
+    const studentBranch = studentProfile?.branch || '';
+    const studentSection = studentProfile?.section || '';
+    const effectiveRoll = studentProfile?.rollNumber || rollNumber || 'No Roll';
 
     // 🎨 PRODUCTION PERSONA — STICK TO ACADEMICS
     let systemPrompt = `You are the AcademicCore Mentor, a specialized AI for HITAM students.
-    
+
     YOUR SOUL: 70% Zen Sensei, 20% Intellectual Professor, 10% Precise Analyst.
 
     EXAM MODE / QUIZ RULES:
     1. If a student asks for a quiz or for you to ask questions, present exactly ONE question at a time.
-    2. NEVER provide the answer alongside the question. 
+    2. NEVER provide the answer alongside the question.
     3. Wait for the student to attempt a response before giving feedback or moving to the next question.
     4. Maintain a supportive, encouraging tone but stay rigorous in accuracy.
 
@@ -210,11 +285,12 @@ export class AiService {
     - Always prioritize MODULE_RESOURCE for defining core concepts.
 
     STRICT GUIDELINES:
-    1. Answers MUST be grounded in the provided [CONTEXT]. 
-    2. Start directly with the answer. 
+    1. Answers MUST be grounded in the provided [CONTEXT].
+    2. Start directly with the answer.
     3. Use Markdown (Bold, Lists) for clarity.
     4. GENERAL MODE: If no specific PDF results are found in the [CONTEXT], but the student is asking about their syllabus overview or subjects, use the context to list their subjects and provide general academic guidance. DO NOT just say "Topic not covered" for general meta-questions.
-    
+    5. GROUNDING RULE: If the answer is not in the retrieved [CONTEXT], explicitly say "I don't have that information in the uploaded materials." Do not answer from general knowledge.
+
     FORMATTING RULES:
     - NEVER output raw quote marks like "" in your response.
     - NEVER use markdown artifacts (e.g., <artifact> tags) or side-panel instructions.
@@ -222,10 +298,18 @@ export class AiService {
     - Provide ONLY the direct conversational response.
     - Use clean, natural language. Do not echo template syntax or context delimiters.
 
+    STUDENT PROFILE:
+    Name: ${studentName}.
+    Roll Number: ${effectiveRoll}.
+    Year: ${studentYear}.
+    Branch: ${studentBranch || 'Not specified'}.
+    Section: ${studentSection || 'Not specified'}.
+
     DYNAMIC CONTEXT:
     Today: ${dateString}.
-    Student: ${studentYear} (${rollNumber || 'No Roll'}).
-    Focus: ${subject}.`;
+    Focus: ${subject}.${activeModule ? `\n    Active Module: Module ${activeModule}.` : ''}
+
+    RESPONSE STYLE (for this query): ${strategy.style}`;
 
     const chatMessages = [
       { role: "system", content: systemPrompt },
@@ -239,9 +323,9 @@ export class AiService {
     const requestBody = {
       model: modelToUse,
       messages: chatMessages,
-      temperature: isDeep ? 0.7 : 0.5,
+      temperature: strategy.temperature,
       top_p: 0.9,
-      max_tokens: isDeep ? 16384 : 1024,
+      max_tokens: strategy.max_tokens,
       stream: true
     };
 
@@ -257,6 +341,102 @@ export class AiService {
 
     if (!response.ok) throw new Error(`Chat API Error: ${await response.text()}`);
     return response.body;
+  }
+
+  /**
+   * UPGRADE 7 — RESPONSE VALIDATION & SAFETY
+   * Defined failure actions per case:
+   *   empty          → fallback message with suggested next action
+   *   contradiction  → regenerate once, then fallback if still invalid
+   *   wrong_module   → flag, filter, return fallback
+   *   exam_mode      → block, return lockdown notice
+   *
+   * Returns: { valid, failureType, action, fallbackMessage }
+   */
+  async validateResponse(responseText, contextText, intent, subject, isExamMode = false) {
+    const trimmed = (responseText || '').trim();
+
+    // ── Guard: Exam mode + Q&A attempted ─────────────────────────────────
+    if (isExamMode) {
+      return {
+        valid: false,
+        failureType: 'exam_mode',
+        action: 'block',
+        fallbackMessage: '🔒 Exam Mode Active. Q&A is disabled during examination hours. Good luck!'
+      };
+    }
+
+    // ── Guard: Empty or refusal response ─────────────────────────────────
+    const refusalPhrases = ["i don't know", "i cannot", "i do not know", "i'm not sure", "i am not sure", "no information"];
+    const isEmptyOrRefusal = trimmed.length < 30 || refusalPhrases.some(p => trimmed.toLowerCase().includes(p));
+
+    if (isEmptyOrRefusal) {
+      return {
+        valid: false,
+        failureType: 'empty',
+        action: 'fallback',
+        fallbackMessage: `I couldn't find a clear answer in the uploaded materials for **${subject || 'this topic'}**. Try rephrasing, or check if the relevant PDF has been uploaded by your admin.`
+      };
+    }
+
+    // ── Guard: Wrong module reference ─────────────────────────────────────
+    // Detect if response mentions a module number not present in context
+    const moduleInResponse = trimmed.match(/module\s*(\d)/i);
+    const moduleInContext  = contextText?.match(/module\s*(\d)/i);
+    if (moduleInResponse && moduleInContext && moduleInResponse[1] !== moduleInContext[1]) {
+      return {
+        valid: false,
+        failureType: 'wrong_module',
+        action: 'fallback',
+        fallbackMessage: `⚠️ The response referenced Module ${moduleInResponse[1]} but your question context is for Module ${moduleInContext[1]}. Please check the uploaded PDF for Module ${moduleInContext[1]}.`
+      };
+    }
+
+    // ── Guard: Contradiction check (lightweight LLM call) ─────────────────
+    // Only run if we have real context (not the "no materials" placeholder)
+    if (contextText && !contextText.includes('No specific materials')) {
+      try {
+        const checkResponse = await fetch(`${BASE_URL}/chat/completions`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${NVIDIA_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'meta/llama-3.1-8b-instruct',
+            messages: [
+              {
+                role: 'system',
+                content: 'You are a fact-checker. Given a CONTEXT and a RESPONSE, does the response directly contradict specific facts stated in the context? Answer ONLY with JSON: {"contradicts": true} or {"contradicts": false}. If unsure, answer false.'
+              },
+              {
+                role: 'user',
+                content: `CONTEXT:\n${contextText.slice(0, 1500)}\n\nRESPONSE:\n${trimmed.slice(0, 800)}`
+              }
+            ],
+            temperature: 0.1,
+            max_tokens: 20
+          })
+        });
+
+        if (checkResponse.ok) {
+          const checkData = await checkResponse.json();
+          const checkRaw = checkData.choices[0]?.message?.content || '{}';
+          const checkParsed = JSON.parse(this.cleanJsonResponse(checkRaw));
+
+          if (checkParsed.contradicts === true) {
+            return {
+              valid: false,
+              failureType: 'contradiction',
+              action: 'regenerate',  // api.js will retry once, then fallback if still invalid
+              fallbackMessage: `I found conflicting information. Please review the uploaded materials directly, or ask a more specific question about **${subject || 'this topic'}**.`
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('Validation contradiction check failed (non-critical):', e.message);
+        // Don't block on validator failure — pass through
+      }
+    }
+
+    return { valid: true, failureType: null, action: 'pass', fallbackMessage: null };
   }
 
   async performVisionOcr(base64Image, mimeType = "image/png") {
