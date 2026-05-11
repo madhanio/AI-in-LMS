@@ -151,6 +151,9 @@ SHORTHAND DICTIONARY (memorize these):
 - flat = Formal Languages and Automata Theory
 - cd = Compiler Design
 - wt = Web Technologies
+- coi = constitution of india
+- smf = statistical mathematical foundation
+- ids = introduction to data science
 - mid, mid1, mid2 = MID 1, MID 2 (midterm exam)
 - prev yr, prev year = previous year
 - pls, plz = (remove, don't expand)
