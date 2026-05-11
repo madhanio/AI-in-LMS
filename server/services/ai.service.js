@@ -132,7 +132,11 @@ Your ONLY job: fix typos, expand abbreviations, and resolve shorthand. Do NOT ch
 SHORTHAND DICTIONARY (memorize these):
 - 2m, 2marks, 2 mark = 2 mark (NOT module 2, NOT multiple choice)
 - 10m, 10marks = 10 mark
-- mod, mod3 = module 3
+- u1, m1, mod1 = module 1
+- u2, m2, mod2 = module 2
+- u3, m3, mod3 = module 3
+- u4, m4, mod4 = module 4
+- u5, m5, mod5 = module 5
 - imp = important
 - qns, ques, qn = questions
 - qb = question bank
@@ -143,6 +147,10 @@ SHORTHAND DICTIONARY (memorize these):
 - se = Software Engineering
 - mp = Microprocessors
 - coa = Computer Organization and Architecture
+- daa = Design and Analysis of Algorithms
+- flat = Formal Languages and Automata Theory
+- cd = Compiler Design
+- wt = Web Technologies
 - mid, mid1, mid2 = MID 1, MID 2 (midterm exam)
 - prev yr, prev year = previous year
 - pls, plz = (remove, don't expand)
@@ -239,21 +247,21 @@ JSON SCHEMA: { "intent": "...", "currentSubject": "..." | null, "activeModule": 
 
   async getChatAnswer(question, contextText, history = [], subject = "General Academics", intent = "concept_explanation", rollNumber = "", studentProfile = {}, activeModule = null) {
     const isCasual = intent === 'concept_explanation' && question.trim().split(/\s+/).length <= 3;
-    
+
     // UPGRADE 5 — MODEL ROUTING (Cost/Complexity optimization)
     const simpleIntents = ['calendar_query', 'student_data_query', 'troubleshooting'];
     const modelToUse = simpleIntents.includes(intent) ? "meta/llama-3.1-8b-instruct" : currentModel;
-    
+
     console.log(`🧠 Using model: ${modelToUse} | Intent: ${intent}`);
 
     // 🏙️ UPGRADE 5 — INTENT-TO-STRATEGY MAP
     const intentStrategyMap = {
-      exam_preparation:  { temperature: 0.3, max_tokens: 1024,  style: 'Respond with concise, numbered bullet points. Be keyword-dense. Prioritize exam-relevant facts and definitions.' },
-      concept_explanation: { temperature: 0.6, max_tokens: 2048,  style: 'Explain using clear analogies. Progress from beginner-level intuition to technical depth. Use examples.' },
-      troubleshooting:   { temperature: 0.4, max_tokens: 1024,  style: 'Respond step-by-step. Number each step. Diagnose before prescribing. Be precise and actionable.' },
-      syllabus_query:    { temperature: 0.4, max_tokens: 1536,  style: 'Structure response module-wise. Use bold headers per module. Be comprehensive but organized.' },
-      student_data_query:{ temperature: 0.2, max_tokens: 512,   style: 'Respond directly with the requested data first. Minimal prose. No filler.' },
-      calendar_query:    { temperature: 0.2, max_tokens: 512,   style: 'Extract and state exactly what the academic calendar says about the queried dates. Do not invent events.' }
+      exam_preparation: { temperature: 0.3, max_tokens: 1024, style: 'Respond with concise, numbered bullet points. Be keyword-dense. Prioritize exam-relevant facts and definitions.' },
+      concept_explanation: { temperature: 0.6, max_tokens: 2048, style: 'Explain using clear analogies. Progress from beginner-level intuition to technical depth. Use examples.' },
+      troubleshooting: { temperature: 0.4, max_tokens: 1024, style: 'Respond step-by-step. Number each step. Diagnose before prescribing. Be precise and actionable.' },
+      syllabus_query: { temperature: 0.4, max_tokens: 1536, style: 'Structure response module-wise. Use bold headers per module. Be comprehensive but organized.' },
+      student_data_query: { temperature: 0.2, max_tokens: 512, style: 'Respond directly with the requested data first. Minimal prose. No filler.' },
+      calendar_query: { temperature: 0.2, max_tokens: 512, style: 'Extract and state exactly what the academic calendar says about the queried dates. Do not invent events.' }
     };
 
     const strategy = intentStrategyMap[intent] || intentStrategyMap['concept_explanation'];
@@ -380,7 +388,7 @@ JSON SCHEMA: { "intent": "...", "currentSubject": "..." | null, "activeModule": 
     // ── Guard: Wrong module reference ─────────────────────────────────────
     // Detect if response mentions a module number not present in context
     const moduleInResponse = trimmed.match(/module\s*(\d)/i);
-    const moduleInContext  = contextText?.match(/module\s*(\d)/i);
+    const moduleInContext = contextText?.match(/module\s*(\d)/i);
     if (moduleInResponse && moduleInContext && moduleInResponse[1] !== moduleInContext[1]) {
       return {
         valid: false,
@@ -516,7 +524,7 @@ JSON SCHEMA: { "intent": "...", "currentSubject": "..." | null, "activeModule": 
       const data = await response.json();
       const raw = data.choices?.[0]?.message?.content || "{}";
       const meta = JSON.parse(this.cleanJsonResponse(raw));
-      
+
       return {
         contentType: meta.contentType || "TEXT",
         docType: meta.docType || "MODULE_RESOURCE",
@@ -710,10 +718,10 @@ JSON SCHEMA:
    */
   cleanJsonResponse(content) {
     if (!content) return "{}";
-    
+
     // 1. Remove markdown code blocks if present
     let cleaned = content.replace(/```json\n?|```\n?/g, "").trim();
-    
+
     // 2. Repair common LLM syntax errors (Single quotes instead of Double quotes)
     // Fix keys: 'key': -> "key":
     cleaned = cleaned.replace(/(['])?([a-zA-Z0-9_]+)(['])?\s*:/g, '"$2":');
@@ -721,16 +729,16 @@ JSON SCHEMA:
     cleaned = cleaned.replace(/:\s*'([^']*)'/g, ': "$1"');
     // Remove trailing commas: , } -> }
     cleaned = cleaned.replace(/,\s*([\}\]])/g, '$1');
-    
+
     // 3. Find the first { and the last }
     const firstBrace = cleaned.indexOf('{');
     const lastBrace = cleaned.lastIndexOf('}');
-    
+
     if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
       // Extract ONLY what is between the first and last brace
       return cleaned.substring(firstBrace, lastBrace + 1);
     }
-    
+
     // Fallback to original match logic if braces are missing/mangled
     const match = cleaned.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
     return match ? match[0] : "{}";
