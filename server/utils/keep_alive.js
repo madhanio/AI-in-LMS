@@ -17,11 +17,14 @@ export const initKeepAlive = () => {
 
   // Ping every 14 minutes (Render free tier sleeps after 15 mins)
   cron.schedule('*/14 * * * *', () => {
-    console.log('💓 Sending keep-alive ping...');
-    https.get(url, (res) => {
-      console.log(`✅ Ping successful: Status ${res.statusCode}`);
+    // Target the deep warmup endpoint to keep the AI pipeline hot
+    const warmupUrl = url.endsWith('/') ? `${url}api/warmup` : `${url}/api/warmup`;
+    
+    console.log(`💓 Sending deep keep-alive ping to ${warmupUrl}...`);
+    https.get(warmupUrl, (res) => {
+      console.log(`✅ Deep Ping successful: Status ${res.statusCode}`);
     }).on('error', (err) => {
-      console.error(`❌ Ping failed: ${err.message}`);
+      console.error(`❌ Deep Ping failed: ${err.message}`);
     });
   });
 };
