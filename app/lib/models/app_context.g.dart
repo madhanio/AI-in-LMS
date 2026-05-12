@@ -219,6 +219,8 @@ class ScreenTypeAdapter extends TypeAdapter<ScreenType> {
         return ScreenType.general;
       case 5:
         return ScreenType.assignments;
+      case 6:
+        return ScreenType.aiChat;
       default:
         return ScreenType.dashboard;
     }
@@ -244,6 +246,9 @@ class ScreenTypeAdapter extends TypeAdapter<ScreenType> {
         break;
       case ScreenType.assignments:
         writer.writeByte(5);
+        break;
+      case ScreenType.aiChat:
+        writer.writeByte(6);
         break;
     }
   }

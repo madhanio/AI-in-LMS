@@ -14,7 +14,7 @@ class AppContextProvider extends ChangeNotifier {
   FabClearance _fabClearance = FabClearance.none;
 
   // Readiness flag
-  bool _isReady = false;
+  bool _isReady = true;
 
   AppContext get currentContext => _currentContext;
   AppContext? get previousContext => _previousContext;
@@ -29,16 +29,9 @@ class AppContextProvider extends ChangeNotifier {
   }
 
   void updateContext(AppContext newContext) {
-    if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
-
-    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-      if (_currentContext.screenType != newContext.screenType ||
-          _currentContext.metadata != newContext.metadata) {
-        _previousContext = _currentContext;
-        _currentContext = newContext;
-        notifyListeners();
-      }
-    });
+    _previousContext = _currentContext;
+    _currentContext = newContext;
+    notifyListeners();
   }
 
   void updateFabClearance(FabClearance clearance) {

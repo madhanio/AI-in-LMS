@@ -8,6 +8,10 @@ import 'widgets/subject_chip_row.dart';
 import 'widgets/input_bar.dart';
 import 'widgets/suggestion_cards.dart';
 import 'widgets/history_drawer.dart';
+import 'widgets/ai/ai_overlay_layer.dart';
+import 'models/app_context.dart';
+import 'models/message.dart';
+import 'providers/app_context_provider.dart';
 
 class AiChatScreen extends StatefulWidget {
   const AiChatScreen({super.key});
@@ -20,6 +24,13 @@ class _AiChatScreenState extends State<AiChatScreen> {
   final ScrollController _scrollController = ScrollController();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final TextEditingController _suggestionController = TextEditingController();
+  late AppContextProvider _contextProvider;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _contextProvider = Provider.of<AppContextProvider>(context, listen: false);
+  }
 
   final Map<String, List<String>> _subjectSuggestions = {
     "__general__": ["What's on my study schedule? 📅", "Summarize my syllabus 📄", "Give me an exam tip 💡", "How many modules in total? 📚"],
@@ -44,11 +55,23 @@ class _AiChatScreenState extends State<AiChatScreen> {
   @override
   void initState() {
     super.initState();
-    // 🚀 FRESH START: Fetch subjects and generate a unique AI greeting on open
+    
+    // 🚀 GUARANTEED HIDE: Use the global signal to hide the orb
+    // Use addPostFrameCallback to avoid "setState during build" errors
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      AiOverlayLayer.forceHideOrb.value = true;
+      
+      if (!mounted) return;
+      
+      _contextProvider.updateContext(AppContext(
+        screenType: ScreenType.aiChat,
+        restrictionFlags: const RestrictionFlags(showOrb: false),
+        metadata: const GenericMetadata(title: 'AI Chat'),
+      ));
+
       final chatProvider = Provider.of<ChatProvider>(context, listen: false);
       chatProvider.fetchSubjects();
-      
+
       // Only generate a greeting if this is a fresh start (empty chat)
       if (chatProvider.messages.isEmpty) {
         chatProvider.generateInitialGreeting();
@@ -58,8 +81,19 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   @override
   void dispose() {
+    // 🚀 RESTORE ORB: Re-enable the orb when leaving the chat
+    // Use post-frame to ensure the pop animation is well underway
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AiOverlayLayer.forceHideOrb.value = false;
+      
+      // Restore default context safely using cached provider
+      // Also done in post-frame to avoid build-lock errors
+      _contextProvider.updateContext(AppContext.defaultContext());
+    });
+
     _scrollController.dispose();
     _suggestionController.dispose();
+    
     super.dispose();
   }
 
@@ -134,7 +168,14 @@ class _AiChatScreenState extends State<AiChatScreen> {
             child: Container(color: Colors.grey.shade200, height: 1),
           ),
         ),
-        body: SafeArea(
+        body: GestureDetector(
+          onHorizontalDragEnd: (details) {
+            // Right swipe to open history (velocity > 0 means swipe right)
+            if (details.primaryVelocity! > 300) {
+              _scaffoldKey.currentState?.openDrawer();
+            }
+          },
+          child: SafeArea(
           child: Consumer<ChatProvider>(
             builder: (context, chatProvider, child) {
               // Trigger scroll on any message change or streaming chunk
@@ -194,6 +235,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
             },
           ),
         ),
+      ),
         resizeToAvoidBottomInset: true,
       );
   }

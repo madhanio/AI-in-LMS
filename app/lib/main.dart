@@ -45,12 +45,15 @@ void main() async {
   );
 }
 
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'AcademicCore',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -62,9 +65,10 @@ class MyApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFF8F9FA),
         fontFamily: 'Roboto',
       ),
-      home: const AiOverlayLayer(
-        child: DashboardScreen(),
-      ),
+      builder: (context, child) {
+        return AiOverlayLayer(child: child!);
+      },
+      home: const DashboardScreen(),
     );
   }
 }

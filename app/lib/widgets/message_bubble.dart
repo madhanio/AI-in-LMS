@@ -56,8 +56,8 @@ class _MessageBubbleState extends State<MessageBubble> {
     }
 
     return Padding(
-      // Keep chat turns visually connected; list builders add any extra gap.
-      padding: EdgeInsets.only(top: message.isUser ? 0 : 1, bottom: 0),
+      // Improved spacing between messages
+      padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: TweenAnimationBuilder<double>(
         tween: Tween<double>(begin: 0.0, end: 1.0),
         duration: const Duration(milliseconds: 400),
@@ -79,7 +79,7 @@ class _MessageBubbleState extends State<MessageBubble> {
             children: [
               if (!message.isUser)
                 Padding(
-                  padding: const EdgeInsets.only(top: 4, right: 8),
+                  padding: const EdgeInsets.only(left: 12, top: 4, right: 8),
                   child: CircleAvatar(
                     radius: 16,
                     backgroundColor: const Color(
@@ -161,9 +161,9 @@ class _MessageBubbleState extends State<MessageBubble> {
                       child: Container(
                         // Removed tight 2px margin for cleaner spacing
                         margin: EdgeInsets.zero,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: message.isUser ? 16 : 14,
+                          vertical: message.isUser ? 12 : 10,
                         ),
                         constraints: BoxConstraints(
                           maxWidth:

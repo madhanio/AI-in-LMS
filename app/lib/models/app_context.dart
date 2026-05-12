@@ -17,6 +17,8 @@ enum ScreenType {
   general,
   @HiveField(5)
   assignments,
+  @HiveField(6)
+  aiChat,
 }
 
 @HiveType(typeId: HiveConstants.restrictionFlagsTypeId)
