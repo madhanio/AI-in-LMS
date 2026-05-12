@@ -248,14 +248,17 @@ JSON SCHEMA: { "intent": "...", "currentSubject": "..." | null, "activeModule": 
     }
   }
 
-  async getChatAnswer(question, contextText, history = [], subject = "General Academics", intent = "concept_explanation", rollNumber = "", studentProfile = {}, activeModule = null) {
-    const isCasual = intent === 'concept_explanation' && question.trim().split(/\s+/).length <= 3;
+  async getChatAnswer(question, contextText, history = [], subject = "General Academics", intent = "concept_explanation", rollNumber = "", studentProfile = {}, activeModule = null, appContext = {}) {
+    // Enhanced casual detection for meta-questions
+    const metaPatterns = /\b(what can you do|what do you do|what are you|your capabilities|what are your features|what do you offer|what can you help|how can you help|how do you work|what is your purpose|tell me about yourself|about you|your role|what are you capable of|help me)\b/i;
+    const isCasual = (intent === 'concept_explanation' && question.trim().split(/\s+/).length <= 3) 
+                  || metaPatterns.test(question.toLowerCase());
 
     // UPGRADE 5 — MODEL ROUTING (Cost/Complexity optimization)
     const simpleIntents = ['calendar_query', 'student_data_query', 'troubleshooting'];
     const modelToUse = simpleIntents.includes(intent) ? "meta/llama-3.1-8b-instruct" : currentModel;
 
-    console.log(`🧠 Using model: ${modelToUse} | Intent: ${intent}`);
+    console.log(`🧠 Using model: ${modelToUse} | Intent: ${intent} | Casual: ${isCasual}`);
 
     // 🏙️ UPGRADE 5 — INTENT-TO-STRATEGY MAP
     const intentStrategyMap = {
@@ -277,6 +280,11 @@ JSON SCHEMA: { "intent": "...", "currentSubject": "..." | null, "activeModule": 
     const studentBranch = studentProfile?.branch || '';
     const studentSection = studentProfile?.section || '';
     const effectiveRoll = studentProfile?.rollNumber || rollNumber || 'No Roll';
+    const activeScreen = appContext?.screenType || 'unknown';
+    const contextCourse = appContext?.course?.subjectName || '';
+    const contextModule = appContext?.course?.moduleNumber || activeModule;
+    const contextQuiz = appContext?.quiz?.quizTitle || '';
+    const contextTitle = appContext?.title || '';
 
     // 🎨 PRODUCTION PERSONA — STICK TO ACADEMICS
     let systemPrompt = `You are the AcademicCore Mentor, a specialized AI for HITAM students.
@@ -307,6 +315,16 @@ JSON SCHEMA: { "intent": "...", "currentSubject": "..." | null, "activeModule": 
     - Provide ONLY the direct conversational response.
     - Use clean, natural language. Do not echo template syntax or context delimiters.
 
+    CAPABILITIES (If asked what you can do):
+    I am your AcademicCore Mentor. Here's how I can help you:
+    - 📚 **Academic Q&A**: I can answer complex questions from your specific course materials.
+    - 💡 **Concept Clarification**: I can explain theories and definitions with easy-to-understand analogies.
+    - ✍️ **Exam Prep**: I can provide important questions, summarize previous paper trends, and even quiz you.
+    - 🗓️ **Academic Calendar**: I can check your holiday schedule, exam dates, and semester timelines.
+    - 🗺️ **Syllabus Guidance**: I can give you an overview of your subjects and what to focus on per module.
+    
+    Feel free to ask me anything about your studies or HITAM schedule!
+
     STUDENT PROFILE:
     Name: ${studentName}.
     Roll Number: ${effectiveRoll}.
@@ -317,6 +335,11 @@ JSON SCHEMA: { "intent": "...", "currentSubject": "..." | null, "activeModule": 
     DYNAMIC CONTEXT:
     Today: ${dateString}.
     Focus: ${subject}.${activeModule ? `\n    Active Module: Module ${activeModule}.` : ''}
+    Current App Screen: ${activeScreen}.
+    Visible Course: ${contextCourse || 'None'}.
+    Visible Module: ${contextModule || 'None'}.
+    Visible Quiz: ${contextQuiz || 'None'}.
+    Visible Page Title: ${contextTitle || 'None'}.
 
     RESPONSE STYLE (for this query): ${strategy.style}`;
 
@@ -325,7 +348,11 @@ JSON SCHEMA: { "intent": "...", "currentSubject": "..." | null, "activeModule": 
       ...history,
       {
         role: "user",
-        content: isCasual ? question + '\n\nCRITICAL: Respond directly. DO NOT use <antArtifact>, <artifact>, or any XML tags.' : `--- CONTEXT START ---\n${contextText}\n--- CONTEXT END ---\n\nStudent's Question: ${question}\n\nCRITICAL RULE: DO NOT use <antArtifact>, <artifact>, or any XML tags in your response. Respond in plain conversational text only.`
+        content: isCasual
+          ? `${question}
+
+CRITICAL: This is a casual/meta/help request. Answer from the CAPABILITIES and STUDENT PROFILE sections only. Do not search for or mention uploaded context, provided context, question banks, previous paper trends, or source materials unless the student specifically asks for course content. DO NOT use <antArtifact>, <artifact>, or any XML tags.`
+          : `--- CONTEXT START ---\n${contextText}\n--- CONTEXT END ---\n\nStudent's Question: ${question}\n\nCRITICAL RULE: DO NOT use <antArtifact>, <artifact>, or any XML tags in your response. Respond in plain conversational text only.`
       }
     ];
 
@@ -378,6 +405,10 @@ JSON SCHEMA: { "intent": "...", "currentSubject": "..." | null, "activeModule": 
     // ── Guard: Empty or refusal response ─────────────────────────────────
     const refusalPhrases = ["i don't know", "i cannot", "i do not know", "i'm not sure", "i am not sure", "no information"];
     const isEmptyOrRefusal = trimmed.length < 30 || refusalPhrases.some(p => trimmed.toLowerCase().includes(p));
+
+    // SKIP VALIDATION for casual meta-queries (they don't need context)
+    const metaPatterns = /\b(what can you do|what do you do|what are you|your capabilities|what are your features|what do you offer|what can you help|how can you help|how do you work|what is your purpose|tell me about yourself|about you|your role|what are you capable of|help me)\b/i;
+    if (metaPatterns.test(trimmed.toLowerCase())) return { valid: true, failureType: null, action: 'pass', fallbackMessage: null };
 
     if (isEmptyOrRefusal) {
       return {

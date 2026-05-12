@@ -1,14 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'calendar_screen.dart';
-import 'ai_chat_screen.dart';
 import 'providers/chat_provider.dart';
+import 'providers/app_context_provider.dart';
+import 'widgets/ai/ai_overlay_layer.dart';
+import 'models/app_context.dart';
+import 'models/message.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'constants.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  await Hive.initFlutter();
+  // Register Hive Adapters
+  Hive.registerAdapter(ScreenTypeAdapter());
+  Hive.registerAdapter(RestrictionFlagsAdapter());
+  Hive.registerAdapter(CourseMetadataAdapter());
+  Hive.registerAdapter(QuizMetadataAdapter());
+  Hive.registerAdapter(GenericMetadataAdapter());
+  Hive.registerAdapter(AppContextAdapter());
+  Hive.registerAdapter(MessageAdapter());
+
   await Supabase.initialize(
     url: Constants.supabaseUrl,
     anonKey: Constants.supabaseAnonKey,
@@ -19,7 +34,10 @@ void main() async {
       providers: [
         ChangeNotifierProvider(
           create: (_) => ChatProvider(),
-          lazy: false, // 🚀 PERFORMANCE FIX: Pre-warm the AI brain for instant transition
+          lazy: false,
+        ),
+        ChangeNotifierProvider(
+          create: (_) => AppContextProvider(),
         ),
       ],
       child: const MyApp(),
@@ -42,9 +60,11 @@ class MyApp extends StatelessWidget {
         ),
         useMaterial3: true,
         scaffoldBackgroundColor: const Color(0xFFF8F9FA),
-        fontFamily: 'Roboto', 
+        fontFamily: 'Roboto',
       ),
-      home: const DashboardScreen(),
+      home: const AiOverlayLayer(
+        child: DashboardScreen(),
+      ),
     );
   }
 }
@@ -61,16 +81,35 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   int _selectedIndex = 0;
+  final TextEditingController _searchController = TextEditingController();
+  final ValueNotifier<bool> _isSearchEmpty = ValueNotifier(true);
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) return;
+      final contextProvider = context.read<AppContextProvider>();
+      if (_tabController.index == 0) {
+        contextProvider.updateContext(AppContext(
+          screenType: ScreenType.dashboard,
+          metadata: const GenericMetadata(title: 'Dashboard'),
+        ));
+      } else {
+        contextProvider.updateContext(AppContext(
+          screenType: ScreenType.general,
+          metadata: const GenericMetadata(title: 'Site Home'),
+        ));
+      }
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _searchController.dispose();
+    _isSearchEmpty.dispose();
     super.dispose();
   }
 
@@ -128,82 +167,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           ),
         ),
       ),
-      body: Stack(
+      body: TabBarView(
+        controller: _tabController,
         children: [
-          TabBarView(
-            controller: _tabController,
-            children: [
-              _buildDashboardTab(context),
-              const Center(child: Text('Site home content')),
-            ],
-          ),
-          // Floating arrow button on the right edge
-          Positioned(
-            right: -20, 
-            top: MediaQuery.of(context).size.height / 2 - 120,
-            child: Container(
-              height: 55,
-              width: 55,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE5E7EB),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 4,
-                    offset: const Offset(-2, 2),
-                  ),
-                ],
-              ),
-              child: const Align(
-                alignment: Alignment.centerLeft,
-                child: Padding(
-                  padding: EdgeInsets.only(left: 12.0),
-                  child: Icon(Icons.arrow_back_ios_new, size: 16, color: Colors.black87),
-                ),
-              ),
-            ),
-          ),
+          _buildDashboardTab(context),
+          const Center(child: Text('Site home content')),
         ],
-      ),
-      floatingActionButton: Container(
-        height: 65,
-        width: 65,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          gradient: const LinearGradient(
-            colors: [Color(0xFFF98012), Color(0xFFFF4D00)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFFF98012).withValues(alpha: 0.4),
-              blurRadius: 15,
-              spreadRadius: 2,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(20),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const AiChatScreen()),
-              );
-            },
-            child: const Center(
-              child: Icon(
-                Icons.auto_awesome, 
-                color: Colors.white, 
-                size: 32,
-              ),
-            ),
-          ),
-        ),
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -215,6 +184,29 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             setState(() {
               _selectedIndex = index;
             });
+            final contextProvider = context.read<AppContextProvider>();
+            switch (index) {
+              case 0:
+                contextProvider.updateContext(AppContext(
+                  screenType: ScreenType.dashboard,
+                  metadata: const GenericMetadata(title: 'Dashboard'),
+                ));
+                break;
+              case 1:
+                contextProvider.updateContext(AppContext(
+                  screenType: ScreenType.general,
+                  metadata: const GenericMetadata(title: 'Site Home'),
+                ));
+                break;
+              case 2:
+              case 3:
+              case 4:
+                contextProvider.updateContext(AppContext(
+                  screenType: ScreenType.general,
+                  metadata: const GenericMetadata(title: 'Menu'),
+                ));
+                break;
+            }
           },
           type: BottomNavigationBarType.fixed,
           backgroundColor: Colors.white,
@@ -317,9 +309,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: TextField(
-                            decoration: InputDecoration(
+                            controller: _searchController,
+                            onChanged: (val) => _isSearchEmpty.value = val.isEmpty,
+                            decoration: const InputDecoration(
                               hintText: 'Search by activity type or name',
                               hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
                               border: InputBorder.none,
@@ -329,13 +323,25 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         ),
                         const Icon(Icons.search, color: Colors.grey, size: 24),
                         const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade500,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Icon(Icons.close, color: Colors.white, size: 14),
+                        ValueListenableBuilder<bool>(
+                          valueListenable: _isSearchEmpty,
+                          builder: (context, isEmpty, child) {
+                            if (isEmpty) return const SizedBox.shrink();
+                            return GestureDetector(
+                              onTap: () {
+                                _searchController.clear();
+                                _isSearchEmpty.value = true;
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade500,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Icon(Icons.close, color: Colors.white, size: 14),
+                              ),
+                            );
+                          },
                         )
                       ],
                     ),
@@ -450,7 +456,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         ),
                         const SizedBox(height: 24),
                         const Text(
-                          'No activities require action',
+                          'No overdue activities',
                           style: TextStyle(fontSize: 16, color: Colors.black87),
                         ),
                       ],

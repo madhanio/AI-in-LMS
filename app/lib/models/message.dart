@@ -1,9 +1,21 @@
+import 'package:hive/hive.dart';
+import 'hive_constants.dart';
+
+part 'message.g.dart';
+
+@HiveType(typeId: HiveConstants.messageTypeId)
 class Message {
+  @HiveField(0)
   final String id;
+  @HiveField(1)
   String text; // mutable for streaming append
+  @HiveField(2)
   final bool isUser;
+  @HiveField(3)
   final bool isSystemSwitch;
+  @HiveField(4)
   final DateTime createdAt;
+  @HiveField(5)
   List<Map<String, dynamic>>? sources; // Added for RAG citations
   
   Message({

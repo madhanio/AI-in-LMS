@@ -271,7 +271,7 @@ router.post('/settings/model', authenticateAdmin, (req, res) => {
 router.post('/query', async (req, res) => {
   const startTime = Date.now();
   let finalContext = "No specific materials uploaded for this topic. Do not answer from general knowledge.";
-  const { question, subject, history = [], rollNumber = "", isGreeting = false, studentProfile = {} } = req.body;
+  const { question, subject, history = [], rollNumber = "", isGreeting = false, studentProfile = {}, appContext = {} } = req.body;
   let usedSourceContext = false; // 🔒 Only true when answer genuinely comes from uploaded sources
   let isCalendar = false; // Hoisted for cache logic after streaming
 
@@ -291,13 +291,19 @@ router.post('/query', async (req, res) => {
       });
     }
 
-    // 🔥 FAST PATH: Greeting & casual queries skip the entire RAG pipeline
-    const greetingPatterns = /^(hi|hello|hey|introduce|greet|good morning|good evening|who are you)/i;
-    const isCasualQuery = isGreeting || greetingPatterns.test(question.trim()) || (!subject && history.length === 0 && question.toLowerCase().includes('introduce'));
+    // 🔥 FAST PATH: Greeting, casual & meta queries skip the entire RAG pipeline
+    const greetingPatterns = /^(hi|hello|hey|introduce|greet|good morning|good evening|good afternoon|good night|who are you)/i;
+    const metaPatterns = /\b(what can you do|what do you do|what are you|help me|your features|capabilities|what do you offer|your capabilities|what are your features|what can you help|how can you help|how do you work|what is your purpose|tell me about yourself|about you|your role|what are you capable of)\b/i;
+    const isCasualQuery = isGreeting
+      || greetingPatterns.test(question.trim())
+      || metaPatterns.test(question.trim())
+      || (!subject && history.length === 0 && question.toLowerCase().includes('introduce'));
 
     // Sequential pipeline: preprocess raw query first, then classify the CLEANED input
     let cleanedQuestion = question;
-    let intentResult = { intent: 'concept_explanation', currentSubject: subject || 'General', activeModule: null };
+    const contextSubject = appContext?.course?.subjectName || null;
+    const contextModule = appContext?.course?.moduleNumber || null;
+    let intentResult = { intent: 'concept_explanation', currentSubject: subject || contextSubject || 'General', activeModule: contextModule };
 
     if (!isCasualQuery) {
       cleanedQuestion = await aiService.preprocessQuery(question);
@@ -308,8 +314,8 @@ router.post('/query', async (req, res) => {
     }
 
     const intent = intentResult.intent;
-    const currentSubject = intentResult.currentSubject || subject || 'General';
-    const activeModule = intentResult.activeModule;
+    const currentSubject = intentResult.currentSubject || subject || contextSubject || 'General';
+    const activeModule = intentResult.activeModule || contextModule;
     isCalendar = intent === 'calendar_query';
 
     if (!isCasualQuery) {
@@ -346,6 +352,32 @@ router.post('/query', async (req, res) => {
           }
       }
 
+      if (intent === 'student_data_query' && finalContext.includes("No specific materials uploaded")) {
+          const lower = cleanedQuestion.toLowerCase();
+          const profileRoll = rollNumber || studentProfile?.rollNumber || "";
+          const profileSection = studentProfile?.section || "";
+          const contextParts = [];
+
+          if (/\b(attendance|present|absent)\b/i.test(lower)) {
+            contextParts.push(`Attendance Data:\n${JSON.stringify(lmsService.getMockAttendance(profileRoll), null, 2)}`);
+          }
+          if (/\b(timetable|time table|schedule|class|classes|today)\b/i.test(lower)) {
+            contextParts.push(`Timetable Data:\n${JSON.stringify(lmsService.getMockTimetable(profileSection), null, 2)}`);
+          }
+          if (/\b(deadline|assignment|due|submission)\b/i.test(lower)) {
+            contextParts.push(`Deadline Data:\n${JSON.stringify(lmsService.getMockDeadlines(), null, 2)}`);
+          }
+          if (/\b(exam|test|mid|internal)\b/i.test(lower)) {
+            contextParts.push(`Exam Data:\n${JSON.stringify(lmsService.getMockExamSchedule(), null, 2)}`);
+          }
+
+          if (contextParts.length > 0) {
+            finalContext = contextParts.join('\n---\n');
+            usedSourceContext = true;
+            console.log(`✅ Injecting LMS context for student data query (${contextParts.length} block/s).`);
+          }
+      }
+
       // TIER 3: Standard Academic Search (Only if context is still empty or not purely a calendar query)
       if (finalContext.includes("No specific materials uploaded")) {
           // 🔥 NEW: Extract user intent filters (e.g., "Module 3" or "Question Bank")
@@ -354,7 +386,8 @@ router.post('/query', async (req, res) => {
 
           const queryEmbedding = await aiService.getEmbedding(cleanedQuestion, "query");
           
-          let searchSubjects = subject ? [subject, '__CALENDAR__'] : ['__CALENDAR__'];
+          const effectiveSubject = subject || contextSubject;
+          let searchSubjects = effectiveSubject ? [effectiveSubject, '__CALENDAR__'] : ['__CALENDAR__'];
           
           // 🔥 IMPROVED: If no subject is selected, search the global calendar AND a sample of all subjects
           // to handle general queries like "Summarize my syllabus" or "What subjects do I have?"
@@ -454,7 +487,8 @@ router.post('/query', async (req, res) => {
       intent,
       rollNumber,
       studentProfile,
-      activeModule
+      activeModule,
+      appContext
     );
     
     // Set headers for streaming (Critical for Render/Proxy stability)
@@ -506,7 +540,7 @@ router.post('/query', async (req, res) => {
         try {
           const retryStream = await aiService.getChatAnswer(
             `[STRICT] Only use the provided context. ${cleanedQuestion}`,
-            finalContext, trimmedHistory, currentSubject, intent, rollNumber, studentProfile, activeModule
+            finalContext, trimmedHistory, currentSubject, intent, rollNumber, studentProfile, activeModule, appContext
           );
           const retryReader = retryStream.getReader();
           let retryText = '';
@@ -664,4 +698,3 @@ router.get('/lms/exam-mode', (req, res) => {
 });
 
 export default router;
-
