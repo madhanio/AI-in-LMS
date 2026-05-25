@@ -43,26 +43,6 @@ router.get('/check-auth', authenticateAdmin, (req, res) => {
 });
 
 /**
- * DEEP WARMUP ENDPOINT
- * Hit by the keep-alive cron job to prevent AI cold starts.
- * Pings both the database and the external embedding API.
- */
-router.get('/warmup', async (req, res) => {
-  try {
-    // 1. Keep Supabase connection pool and DB active
-    await storageService.getSubjects();
-    // 2. Keep NVIDIA NIM embedding endpoint hot
-    await aiService.getEmbedding("warmup ping");
-    
-    console.log("🔥 Deep Warmup successful.");
-    res.json({ status: "warm", ai: "ready", db: "ready" });
-  } catch (error) {
-    console.error("❌ Deep Warmup failed:", error.message);
-    res.status(500).json({ error: "Warmup failed" });
-  }
-});
-
-/**
  * GET /files - List all subjects and their files
  */
 router.get('/files', async (req, res) => {
