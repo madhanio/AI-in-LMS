@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node --max-old-space-size=450 index.js",
     "dev": "node --watch --max-old-space-size=450 index.js",
-    "postinstall": "pip install --only-binary=:all: -r requirements.txt"
+    "postinstall": "pip install --break-system-packages --only-binary=:all: -r requirements.txt"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.0",
