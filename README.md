@@ -129,4 +129,3 @@ module.exports = {
 
 ---
 
-> **Note:** Place screenshots (`deploy-status.png`, `pm2-status.png`, and `webhook-connection-status.png`) inside the `assets/` directory at the project root.
