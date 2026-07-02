@@ -4,6 +4,9 @@
   "description": "AI LMS Assistant Backend",
   "main": "index.js",
   "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "start": "node --max-old-space-size=450 index.js",
     "dev": "node --watch --max-old-space-size=450 index.js",
