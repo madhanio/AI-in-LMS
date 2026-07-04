@@ -12,7 +12,7 @@ RUN apk add --no-cache \
     python3 \
     py3-pip
 
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json requirements.txt ./
 
 RUN npm ci
 
