@@ -9,7 +9,8 @@ RUN apk add --no-cache \
     jpeg-dev \
     pango-dev \
     giflib-dev \
-    python3
+    python3 \
+    py3-pip
 
 COPY package.json package-lock.json ./
 
