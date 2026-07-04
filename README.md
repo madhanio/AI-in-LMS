@@ -19,7 +19,7 @@ A RAG (Retrieval-Augmented Generation) pipeline embedded in a Moodle-integrated 
 - **Smart Q&A Retrieval:** Extracts and vectorizes multi-format course materials (PDF, DOCX) via NVIDIA NIM.
 - **Vision-Driven Parsing:** Extracts tabular data and calendars using NVIDIA Vision LLM.
 - **Dynamic Query Routing:** Intelligently routes queries between vector search, SQL calendar lookup, and LMS APIs.
-- **Guardrails & Caching:** Enforces Exam Mode restrictions, caches common queries, and validates output to prevent hallucinations.
+
 
 ### 📱 User & Admin Interfaces
 - **SSE Streaming:** Delivers token-by-token stream responses with active source references.
