@@ -80,36 +80,15 @@ Deployed live on **AWS EC2** with a full CI/CD pipeline (GitHub Webhook → Jenk
 
 ### CI/CD Pipeline
 
-GitHub push on `main` triggers a webhook to Jenkins, which runs: Checkout → npm install → pm2 reload → Health Check. Full pipeline completes in ~14 seconds.
+GitHub push on main triggers a webhook to Jenkins, which runs 6 stages: Checkout Code → Cleanup Docker → Build Docker Image → Remove Old Container → Run Docker Container → Health Check. Full pipeline completes in ~2 minutes.
 
 ### Screenshots
 
-**Webhook — Last delivery successful**
-![Webhook Status](assets/webhook-connection-status.png)
-
-**Jenkins Pipeline — Stage View (avg ~14s full run)**
+**Jenkins Pipeline — 6-stage Docker CI/CD (latest run #11, all green)**
 ![Deploy Status](assets/deploy-status.png)
 
-**pm2 Cluster — 2 instances online on EC2 + health check confirmed**
-![PM2 Status](assets/pm2-status.png)
+**Docker container live on EC2 — health check confirmed**
+![Docker Status](assets/docker-status.png)
 
-### PM2 Configuration
-
-The backend runs in **cluster mode** via `ecosystem.config.cjs`:
-
-```js
-module.exports = {
-  apps: [{
-    name: "moodle-ai-backend",
-    script: "./index.js",
-    instances: "max",
-    exec_mode: "cluster",
-    autorestart: true,
-    max_memory_restart: "450M",
-    env: {
-      NODE_ENV: "production",
-      PORT: 3000
-    }
-  }]
-};
-```
+### Docker Configuration
+The backend runs as a Docker container (`moodle-ai-container`) built from `server/Dockerfile`, exposing port `3000`. Managed via `docker-compose` and orchestrated by Jenkins on every push.
