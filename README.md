@@ -73,7 +73,14 @@ GitHub push on main triggers a webhook to Jenkins, which runs 6 stages: Checkout
 ![Deploy Status](assets/deploy-status.png)
 
 **Docker container live on EC2 — health check confirmed**
-![Docker Status](assets/docker-status.png)
+```bash
+$ docker ps
+CONTAINER ID   IMAGE               COMMAND                STATUS             PORTS                                       NAMES
+3e3d29e48392   moodle-ai-backend   "docker-entrypoint.s…" Up About a minute  0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp moodle-ai-container
+
+$ curl http://43.206.238.148:3000/health
+{"status":"ok"}
+```
 
 ### Docker Configuration
 The backend runs as a Docker container (`moodle-ai-container`) built from `server/Dockerfile`, exposing port `3000`. Managed via `docker-compose` and orchestrated by Jenkins on every push.
