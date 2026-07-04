@@ -66,6 +66,9 @@ GitHub push on main triggers a webhook to Jenkins, which runs 6 stages: Checkout
 
 ### Screenshots
 
+**Webhook — Last delivery successful**
+![Webhook Status](assets/webhook-connection-status.png)
+
 **Jenkins Pipeline — 6-stage Docker CI/CD (latest run #11, all green)**
 ![Deploy Status](assets/deploy-status.png)
 
