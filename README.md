@@ -2,31 +2,13 @@
 
 A RAG (Retrieval-Augmented Generation) pipeline embedded in a Moodle-integrated LMS that answers student queries using uploaded course materials, streams responses token-by-token via SSE, and delivers them through a Flutter mobile app.
 
----
-
-## 🛠 Tech Stack
-
-- **Backend:**
-  - `Node.js v20+`
-  - `Express`
-  - `OpenAI SDK`
-  - `Supabase (pgvector)`
-  - `pdf-parse`
-  - `Tesseract.js`
-  - `mammoth`
-  - `multer`
-  - `JWT`
-  - `PM2`
-- **Models:**
-  - `nvidia/nv-embedqa-e5-v5` (embeddings)
-  - `meta/llama-3.1-8b-instruct` / `llama-3.1-70b-instruct` (NVIDIA NIM LLM)
-- **Frontend:**
-  - `Flutter SDK ^3.10.0`
-  - `Provider`
-  - `Hive (local cache)`
-  - `http (SSE client)`
-  - `flutter_markdown`
-  - `url_launcher`
+![Node.js](https://img.shields.io/badge/Node.js-20+-339933?logo=node.js&logoColor=white)
+![Flutter](https://img.shields.io/badge/Flutter-3.10-02569B?logo=flutter&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-pgvector-3ECF8E?logo=supabase&logoColor=white)
+![NVIDIA NIM](https://img.shields.io/badge/NVIDIA-NIM-76B900?logo=nvidia&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-containerized-2496ED?logo=docker&logoColor=white)
+![AWS EC2](https://img.shields.io/badge/AWS-EC2-FF9900?logo=amazonaws&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
 ---
 
