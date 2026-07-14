@@ -58,7 +58,7 @@ Here is a preview of the student client application interface:
 
 ## 🚀 Deployment
 
-Deployed live on **AWS EC2** with a full CI/CD pipeline (GitHub Webhook → Jenkins → pm2).
+Deployed live on **AWS EC2** with a full CI/CD pipeline (GitHub Webhook → Jenkins → Docker).
 
 ### CI/CD Pipeline
 
